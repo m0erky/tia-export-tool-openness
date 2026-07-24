@@ -30,6 +30,8 @@ public sealed class ProjectInventoryStageTests
 
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("TIA_PROJECT_INVENTORY.json", StringComparison.Ordinal));
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("TIA_PROJECT_INVENTORY.md", StringComparison.Ordinal));
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("AI_PROJECT_SUMMARY.md", StringComparison.Ordinal));
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("AI_HARDWARE_SUMMARY.md", StringComparison.Ordinal));
         Assert.Single(report.Issues);
     }
 
