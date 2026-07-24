@@ -125,6 +125,11 @@ public sealed class RegistryTiaInstallationDiscoveryService : ITiaInstallationDi
                 var displayName = $"TIA Portal {version}";
                 var opennessAvailable = LooksLikeOpennessInstall(normalizedInstallPath);
 
+                if (!IsLikelyPortalInstallation(displayName, VersionToToken(version), normalizedInstallPath, opennessAvailable))
+                {
+                    continue;
+                }
+
                 return new DiscoveredTiaPortalInstallation(version, displayName, normalizedInstallPath, opennessAvailable);
             }
             catch (Exception exception)
@@ -179,6 +184,11 @@ public sealed class RegistryTiaInstallationDiscoveryService : ITiaInstallationDi
 
                     var normalizedInstallPath = NormalizeInstallPath(installPath);
                     var opennessAvailable = LooksLikeOpennessInstall(normalizedInstallPath);
+
+                    if (!IsLikelyPortalInstallation(displayName, versionToken, normalizedInstallPath, opennessAvailable))
+                    {
+                        continue;
+                    }
 
                     return new DiscoveredTiaPortalInstallation(version, displayName, normalizedInstallPath, opennessAvailable);
                 }
@@ -242,6 +252,35 @@ public sealed class RegistryTiaInstallationDiscoveryService : ITiaInstallationDi
         }
     }
 
+    private static bool IsLikelyPortalInstallation(string displayName, string versionToken, string installPath, bool opennessAvailable)
+    {
+        if (string.IsNullOrWhiteSpace(displayName)
+            || !displayName.Contains("TIA Portal", StringComparison.OrdinalIgnoreCase)
+            || !displayName.Contains(versionToken, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (displayName.Contains("Help Viewer", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Viewer", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Documentation", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Readme", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Updater", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Update Service", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (opennessAvailable)
+        {
+            return true;
+        }
+
+        return installPath.Contains("Portal V", StringComparison.OrdinalIgnoreCase)
+            || installPath.Contains("Totally Integrated Automation Portal", StringComparison.OrdinalIgnoreCase)
+            || installPath.Contains("TIA Portal", StringComparison.OrdinalIgnoreCase);
+    }
+
     [SupportedOSPlatform("windows")]
     private DiscoveredTiaPortalInstallation? TryReadInstallationFromSiemensTree(
         TiaPortalVersion version,
@@ -286,6 +325,11 @@ public sealed class RegistryTiaInstallationDiscoveryService : ITiaInstallationDi
                 var normalizedInstallPath = NormalizeInstallPath(installPath);
                 var opennessAvailable = LooksLikeOpennessInstall(normalizedInstallPath);
                 var displayName = ReadFirstString(subKey, "DisplayName", "ProductName") ?? $"TIA Portal {version}";
+
+                if (!IsLikelyPortalInstallation(displayName, versionToken, normalizedInstallPath, opennessAvailable))
+                {
+                    continue;
+                }
 
                 return new DiscoveredTiaPortalInstallation(version, displayName, normalizedInstallPath, opennessAvailable);
             }

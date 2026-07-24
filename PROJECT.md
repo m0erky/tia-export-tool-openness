@@ -163,6 +163,7 @@ Scope:
 - Updated `README.md` to document executive summary artifacts and Windows validation workflow assets.
 - Hardened Windows TIA installation discovery for V18/V19/V20 by probing multiple Siemens registry key layouts, user/machine hives, and uninstall entries, plus recursive Siemens tree fallback probing.
 - Added README troubleshooting guidance for Windows installations not being detected.
+- Refined discovery filters to reject non-product uninstall matches (for example `TIA Portal Help Viewer`) and prefer likely real portal installations with Openness indicators.
 
 ## Known Issues
 

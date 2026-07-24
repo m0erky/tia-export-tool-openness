@@ -194,7 +194,8 @@ Current keys:
   - Start the UI as a user that can read machine registry keys.
   - Verify TIA Portal and Openness are installed for that machine/user.
   - Re-run **Detect Versions** after installing or repairing TIA components.
-  - The discovery logic now probes multiple Siemens registry layouts and uninstall entries for V18/V19/V20, but custom corporate installations may still require registry policy exceptions.
+  - The discovery logic now probes multiple Siemens registry layouts and uninstall entries for V18/V19/V20, and excludes non-product matches (for example `TIA Portal Help Viewer`).
+  - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note
 
