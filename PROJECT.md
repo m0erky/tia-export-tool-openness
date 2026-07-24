@@ -45,7 +45,7 @@ Scope:
 
 ## TODO List
 
-- Implement a concrete Siemens Openness-backed inventory provider for project metadata, device tree, and software discovery.
+- Implement deep Siemens.Engineering traversal (devices, network, PLC software, blocks, tags, UDTs, HMI, diagnostics) behind the reflection-safe Openness adapter.
 - Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
 - Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
 
@@ -76,6 +76,8 @@ Scope:
 - Expanded automated validation to 10 passing xUnit tests in `TiaProjectExporter.Tests`.
 - Added user settings persistence (`LocalApplicationData/TiaProjectExporter/user-settings.json`) for output folder history, project path, and export option selections.
 - Updated the output folder input to an editable history-backed combobox and persisted settings during export completion and application shutdown.
+- Replaced the placeholder Openness adapter with a reflection-safe runtime probe that selects supported installed versions (V18/V19/V20), resolves Siemens.Engineering assembly candidates, and returns structured issues instead of crashing.
+- Added non-Windows adapter safety test coverage and expanded automated validation to 11 passing xUnit tests.
 
 ## Known Issues
 
@@ -84,8 +86,7 @@ Scope:
 - WPF cancellation behavior is implemented but still requires Windows runtime validation against real long-running export stages.
 - Recent output folder history behavior still needs UX validation on Windows for long path editing and combobox interaction.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
-- TIA project inventory export currently emits placeholder availability/status artifacts until the Siemens Openness adapter is implemented.
-- Siemens.Engineering integration is still pending; current Openness adapter intentionally returns structured placeholder issues.
+- Full Siemens.Engineering object traversal is still pending; the current adapter validates runtime availability and reports structured readiness issues.
 - `FILE_INDEX.json`, `SEARCH_INDEX.json`, and `BLOCK_CALL_GRAPH.md` are still placeholder-first and need deep object-level export data.
 
 ## Future Improvements
