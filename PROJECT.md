@@ -96,6 +96,7 @@ Scope:
 - Added root `global.json` pinning .NET SDK `8.0.423` for deterministic local/CI builds.
 - Enhanced report/statistics generation with archive metadata sections (`Packaging` in `EXPORT_REPORT.md` and `archive` in `PROJECT_STATISTICS.json`).
 - Added archive metadata enrichment with `ExportArchiveInfo` (size and SHA-256) captured during compression and surfaced in report/statistics outputs.
+- Extended the reflection-based Siemens Openness adapter to traverse software-level runtime object graphs (beyond devices) and emit categorized nodes (`OB`, `FB`, `FC`, `DB`, `Block`, `Tag`, `UDT`, `Screen`, `Faceplate`, `HMI`) with metadata and reference heuristics (`Calls`, `Dependencies`, multilingual text hints).
 
 ## Known Issues
 
@@ -113,6 +114,7 @@ Scope:
 - ZIP packaging has Linux test coverage but still needs end-to-end Windows validation with real large TIA exports.
 - Current Linux workspace has SDK `8.0.129`; with `global.json` pinned to `8.0.423`, local `dotnet` commands now require installing SDK `8.0.423` first.
 - In this sandbox, running tests with the locally installed `~/.dotnet` SDK can fail due MSBuild named-pipe permission restrictions; verify test pass on a normal host shell/session.
+- Reflection traversal now includes breadth/depth-limited graph walking; real-world validation on V18/V19/V20 projects is still required to tune false positives/duplicates and object classification heuristics.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements

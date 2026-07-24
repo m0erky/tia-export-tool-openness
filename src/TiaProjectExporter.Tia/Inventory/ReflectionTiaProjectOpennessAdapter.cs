@@ -300,6 +300,8 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
                     ["RuntimeType"] = runtimeType
                 }));
 
+            TraverseSoftwareGraphForDevice(device, deviceName, objects, issues, cancellationToken);
+
             deviceCount++;
         }
 
@@ -310,6 +312,315 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
                 "No devices were enumerated from the opened project.",
                 "Device composition may be empty or further API adaptation is required."));
         }
+    }
+
+    private static void TraverseSoftwareGraphForDevice(
+        object? device,
+        string deviceName,
+        ICollection<TiaProjectObjectNode> objects,
+        ICollection<ExportIssue> issues,
+        CancellationToken cancellationToken)
+    {
+        if (device is null)
+        {
+            return;
+        }
+
+        var queue = new Queue<(object Node, string Path, int Depth)>();
+        var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        queue.Enqueue((device, $"Project/Devices/{deviceName}", 2));
+
+        var discoveredCount = 0;
+        const int MaxNodes = 5000;
+
+        while (queue.Count > 0 && discoveredCount < MaxNodes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var (current, currentPath, depth) = queue.Dequeue();
+
+            if (!visited.Add(current))
+            {
+                continue;
+            }
+
+            foreach (var child in EnumerateChildObjects(current))
+            {
+                if (child is null || visited.Contains(child))
+                {
+                    continue;
+                }
+
+                var childName = TryReadString(child, "Name")
+                    ?? TryReadString(child, "DisplayName")
+                    ?? child.GetType().Name;
+
+                var childPath = $"{currentPath}/{childName}";
+                var objectType = ClassifyNodeType(child.GetType().Name);
+
+                if (objectType is not null)
+                {
+                    var metadata = BuildMetadata(child);
+
+                    objects.Add(new TiaProjectObjectNode(
+                        ObjectType: objectType,
+                        Name: childName,
+                        QualifiedPath: childPath,
+                        Depth: depth + 1,
+                        Metadata: metadata));
+
+                    discoveredCount++;
+                }
+
+                if (depth < 6)
+                {
+                    queue.Enqueue((child, childPath, depth + 1));
+                }
+            }
+        }
+
+        if (discoveredCount == 0)
+        {
+            issues.Add(new ExportIssue(
+                "OpennessTraversal",
+                $"No software-level objects discovered for device '{deviceName}'.",
+                "Reflection graph traversal did not identify block/tag/HMI-like objects for this device yet."));
+        }
+    }
+
+    private static IEnumerable<object> EnumerateChildObjects(object parent)
+    {
+        var properties = parent.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+        foreach (var property in properties)
+        {
+            if (!property.CanRead || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            object? value;
+
+            try
+            {
+                value = property.GetValue(parent);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (value is null)
+            {
+                continue;
+            }
+
+            if (IsSimpleValue(value.GetType()))
+            {
+                continue;
+            }
+
+            if (value is IEnumerable enumerable and value is not string)
+            {
+                foreach (var item in enumerable)
+                {
+                    if (item is null || IsSimpleValue(item.GetType()))
+                    {
+                        continue;
+                    }
+
+                    yield return item;
+                }
+
+                continue;
+            }
+
+            yield return value;
+        }
+    }
+
+    private static bool IsSimpleValue(Type type)
+    {
+        if (type.IsPrimitive || type.IsEnum)
+        {
+            return true;
+        }
+
+        return type == typeof(string)
+            || type == typeof(decimal)
+            || type == typeof(DateTime)
+            || type == typeof(DateTimeOffset)
+            || type == typeof(TimeSpan)
+            || type == typeof(Guid);
+    }
+
+    private static string? ClassifyNodeType(string runtimeTypeName)
+    {
+        if (runtimeTypeName.Contains("OB", StringComparison.OrdinalIgnoreCase))
+        {
+            return "OB";
+        }
+
+        if (runtimeTypeName.Contains("FB", StringComparison.OrdinalIgnoreCase))
+        {
+            return "FB";
+        }
+
+        if (runtimeTypeName.Contains("FC", StringComparison.OrdinalIgnoreCase))
+        {
+            return "FC";
+        }
+
+        if (runtimeTypeName.Contains("DB", StringComparison.OrdinalIgnoreCase))
+        {
+            return "DB";
+        }
+
+        if (runtimeTypeName.Contains("Block", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Block";
+        }
+
+        if (runtimeTypeName.Contains("Tag", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Tag";
+        }
+
+        if (runtimeTypeName.Contains("Type", StringComparison.OrdinalIgnoreCase)
+            || runtimeTypeName.Contains("UDT", StringComparison.OrdinalIgnoreCase))
+        {
+            return "UDT";
+        }
+
+        if (runtimeTypeName.Contains("Screen", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Screen";
+        }
+
+        if (runtimeTypeName.Contains("Faceplate", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Faceplate";
+        }
+
+        if (runtimeTypeName.Contains("Hmi", StringComparison.OrdinalIgnoreCase))
+        {
+            return "HMI";
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildMetadata(object node)
+    {
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["RuntimeType"] = node.GetType().FullName ?? node.GetType().Name
+        };
+
+        AddMetadataIfPresent(node, metadata, "Comment", "Comment");
+        AddMetadataIfPresent(node, metadata, "Title", "Title");
+        AddMetadataIfPresent(node, metadata, "Description", "Description");
+        AddMetadataIfPresent(node, metadata, "Text", "Text");
+        AddMetadataIfPresent(node, metadata, "TextDe", "Text_de-DE");
+        AddMetadataIfPresent(node, metadata, "TextEn", "Text_en-US");
+        AddMetadataIfPresent(node, metadata, "CommentDe", "Comment_de-DE");
+        AddMetadataIfPresent(node, metadata, "CommentEn", "Comment_en-US");
+
+        var calls = ExtractNamedReferences(node, "Calls", "CalledBlocks", "ReferencedBlocks", "UsedBlocks");
+        if (calls.Length > 0)
+        {
+            metadata["Calls"] = string.Join(", ", calls);
+        }
+
+        var dependencies = ExtractNamedReferences(node, "References", "Dependencies", "UsedTypes", "ReferencedTags");
+        if (dependencies.Length > 0)
+        {
+            metadata["Dependencies"] = string.Join(", ", dependencies);
+        }
+
+        return metadata;
+    }
+
+    private static void AddMetadataIfPresent(object node, IDictionary<string, string> metadata, string propertyName, string metadataKey)
+    {
+        var value = TryReadString(node, propertyName);
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            metadata[metadataKey] = value;
+        }
+    }
+
+    private static string? TryReadString(object node, string propertyName)
+    {
+        try
+        {
+            var property = node.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+            var value = property?.GetValue(node);
+            return value?.ToString();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string[] ExtractNamedReferences(object node, params string[] propertyNames)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var propertyName in propertyNames)
+        {
+            object? value;
+
+            try
+            {
+                var property = node.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+                value = property?.GetValue(node);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (value is null)
+            {
+                continue;
+            }
+
+            if (value is string stringValue)
+            {
+                if (!string.IsNullOrWhiteSpace(stringValue))
+                {
+                    names.Add(stringValue.Trim());
+                }
+
+                continue;
+            }
+
+            if (value is IEnumerable enumerable)
+            {
+                foreach (var item in enumerable)
+                {
+                    var name = item is null ? null : TryReadString(item, "Name") ?? item.ToString();
+
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        names.Add(name.Trim());
+                    }
+                }
+
+                continue;
+            }
+
+            var singleName = TryReadString(value, "Name") ?? value.ToString();
+            if (!string.IsNullOrWhiteSpace(singleName))
+            {
+                names.Add(singleName.Trim());
+            }
+        }
+
+        return names.ToArray();
     }
 
     private static void TryCloseProject(object? project)
