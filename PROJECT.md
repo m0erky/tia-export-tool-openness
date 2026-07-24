@@ -93,6 +93,8 @@ Scope:
 - Expanded automated validation to 16 passing xUnit tests.
 - Added compression packaging support via `CompressionStage` and `ZipExportArchiveService` to generate `Export.zip` when `EnableCompression=true`.
 - Expanded automated validation to 18 passing xUnit tests.
+- Added root `global.json` pinning .NET SDK `8.0.423` for deterministic local/CI builds.
+- Enhanced report/statistics generation with archive metadata sections (`Packaging` in `EXPORT_REPORT.md` and `archive` in `PROJECT_STATISTICS.json`).
 
 ## Known Issues
 
@@ -108,6 +110,7 @@ Scope:
 - Tag usage and unused-object detection currently rely on metadata heuristics and still require deeper Siemens semantic references for higher precision.
 - Multilingual extraction currently relies on metadata key heuristics and should be extended with direct Siemens language-resource APIs when full traversal is available.
 - ZIP packaging has Linux test coverage but still needs end-to-end Windows validation with real large TIA exports.
+- Current Linux workspace has SDK `8.0.129`; with `global.json` pinned to `8.0.423`, local `dotnet` commands now require installing SDK `8.0.423` first.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements
@@ -128,6 +131,10 @@ dotnet restore
 dotnet build TiaProjectExporter.sln
 dotnet test TiaProjectExporter.sln
 ```
+
+SDK pinning:
+
+- `global.json` in the repository root pins the SDK to `8.0.423` (`rollForward: latestPatch`).
 
 Windows-specific notes:
 

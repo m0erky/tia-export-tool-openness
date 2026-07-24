@@ -86,7 +86,8 @@ public sealed class ExportReportStage : IExportStage
                 context.Options.SkipDiagnostics,
                 context.Options.GenerateMarkdownSummaries
             },
-            ObjectTypes = objectTypeCounts
+            ObjectTypes = objectTypeCounts,
+            Archive = BuildArchiveSection(context, report)
         };
 
         return JsonSerializer.Serialize(payload, jsonOptions);
@@ -222,6 +223,8 @@ public sealed class ExportReportStage : IExportStage
         builder.AppendLine($"- End time: `{report.FinishedAt:O}`");
         builder.AppendLine($"- Duration: **{duration:hh\\:mm\\:ss}**");
         builder.AppendLine();
+        AppendPackagingSection(builder, context, report);
+        builder.AppendLine();
         builder.AppendLine("## Stage/Object Results");
         builder.AppendLine();
 
@@ -258,4 +261,50 @@ public sealed class ExportReportStage : IExportStage
         string.IsNullOrWhiteSpace(message)
             ? string.Empty
             : $" ({message})";
+
+    private static object BuildArchiveSection(ExportExecutionContext context, ExportReport report)
+    {
+        var packagingResult = report.Results
+            .LastOrDefault(result =>
+                result.ObjectType.Equals("Packaging", StringComparison.OrdinalIgnoreCase)
+                && result.Identifier.Equals("ExportZip", StringComparison.OrdinalIgnoreCase));
+
+        var expectedPath = Path.Combine(context.Options.OutputDirectory, "Export.zip");
+
+        return new
+        {
+            context.Options.EnableCompression,
+            ExpectedPath = expectedPath,
+            Status = packagingResult?.Status.ToString() ?? (context.Options.EnableCompression ? "Pending" : "Skipped"),
+            ArchivePath = packagingResult?.Message
+        };
+    }
+
+    private static void AppendPackagingSection(StringBuilder builder, ExportExecutionContext context, ExportReport report)
+    {
+        var packagingResult = report.Results
+            .LastOrDefault(result =>
+                result.ObjectType.Equals("Packaging", StringComparison.OrdinalIgnoreCase)
+                && result.Identifier.Equals("ExportZip", StringComparison.OrdinalIgnoreCase));
+
+        var expectedPath = Path.Combine(context.Options.OutputDirectory, "Export.zip");
+
+        builder.AppendLine("## Packaging");
+        builder.AppendLine();
+        builder.AppendLine($"- Compression enabled: **{context.Options.EnableCompression}**");
+        builder.AppendLine($"- Expected archive path: `{expectedPath}`");
+
+        if (packagingResult is null)
+        {
+            builder.AppendLine($"- Archive status: **{(context.Options.EnableCompression ? "Pending" : "Skipped")}**");
+            return;
+        }
+
+        builder.AppendLine($"- Archive status: **{packagingResult.Status}**");
+
+        if (!string.IsNullOrWhiteSpace(packagingResult.Message))
+        {
+            builder.AppendLine($"- Archive output: `{packagingResult.Message}`");
+        }
+    }
 }

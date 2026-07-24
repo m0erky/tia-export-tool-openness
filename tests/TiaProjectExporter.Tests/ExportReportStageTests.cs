@@ -31,10 +31,12 @@ public sealed class ExportReportStageTests
 
         Assert.Contains("Recoverable issues", overview.Content, StringComparison.Ordinal);
         Assert.Contains("Analysis Hub", overview.Content, StringComparison.Ordinal);
+        Assert.Contains("Packaging", report.Content, StringComparison.Ordinal);
         Assert.Contains("Inventory", report.Content, StringComparison.Ordinal);
         using var document = JsonDocument.Parse(statistics.Content);
         var totalsElement = document.RootElement.GetProperty("totals");
         Assert.Equal(1, totalsElement.GetProperty("issues").GetInt32());
+        Assert.True(document.RootElement.TryGetProperty("archive", out _));
     }
 
     private sealed class RecordingArtifactWriter : IExportArtifactWriter
