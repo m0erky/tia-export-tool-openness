@@ -13,8 +13,10 @@ namespace TiaProjectExporter.UI.ViewModels;
 /// </summary>
 public sealed class MainWindowViewModel : ObservableObject
 {
+    private const int MaxRecentOutputDirectories = 10;
     private readonly ITiaInstallationDiscoveryService _installationDiscoveryService;
     private readonly ExportCoordinator _exportCoordinator;
+    private readonly IExporterSettingsStore _settingsStore;
     private readonly UiLogCollector _logCollector;
     private string _projectPath = string.Empty;
     private string _outputDirectory;
@@ -41,10 +43,12 @@ public sealed class MainWindowViewModel : ObservableObject
         ITiaInstallationDiscoveryService installationDiscoveryService,
         ExportCoordinator exportCoordinator,
         ExporterSettings settings,
+        IExporterSettingsStore settingsStore,
         UiLogCollector logCollector)
     {
         _installationDiscoveryService = installationDiscoveryService;
         _exportCoordinator = exportCoordinator;
+        _settingsStore = settingsStore;
         _logCollector = logCollector;
 
         _outputDirectory = settings.DefaultOutputDirectory;
@@ -57,6 +61,8 @@ public sealed class MainWindowViewModel : ObservableObject
         CancelExportCommand = new AsyncRelayCommand(CancelExportAsync, CanCancelExport, HandleCommandExceptionAsync);
 
         logCollector.EntryAdded += OnLogEntryAdded;
+
+        LoadPersistedSettings();
     }
 
     /// <summary>
@@ -68,6 +74,11 @@ public sealed class MainWindowViewModel : ObservableObject
     /// Gets the UI log entries.
     /// </summary>
     public ObservableCollection<string> LogEntries { get; } = [];
+
+    /// <summary>
+    /// Gets recent output directories used by the exporter.
+    /// </summary>
+    public ObservableCollection<string> RecentOutputDirectories { get; } = [];
 
     /// <summary>
     /// Gets the command that detects installed TIA versions.
@@ -226,6 +237,11 @@ public sealed class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Persists the current user settings to local storage.
+    /// </summary>
+    public Task PersistSettingsAsync(CancellationToken cancellationToken) => SavePersistedSettingsAsync(cancellationToken);
+
+    /// <summary>
     /// Gets or sets a value indicating whether an export is currently running.
     /// </summary>
     public bool IsExporting
@@ -274,6 +290,7 @@ public sealed class MainWindowViewModel : ObservableObject
         using var cancellationTokenSource = new CancellationTokenSource();
         _exportCancellationTokenSource = cancellationTokenSource;
         IsExporting = true;
+        AddRecentOutputDirectory(OutputDirectory);
 
         try
         {
@@ -306,6 +323,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
         finally
         {
+            await SavePersistedSettingsAsync(CancellationToken.None);
             _exportCancellationTokenSource = null;
             IsExporting = false;
         }
@@ -342,6 +360,72 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool CanExport() => !IsExporting && !string.IsNullOrWhiteSpace(OutputDirectory);
 
     private bool CanCancelExport() => IsExporting && _exportCancellationTokenSource is { IsCancellationRequested: false };
+
+    private void LoadPersistedSettings()
+    {
+        var persisted = _settingsStore.Load();
+
+        ProjectPath = string.IsNullOrWhiteSpace(persisted.LastProjectPath)
+            ? ProjectPath
+            : persisted.LastProjectPath;
+
+        OutputDirectory = string.IsNullOrWhiteSpace(persisted.LastOutputDirectory)
+            ? OutputDirectory
+            : persisted.LastOutputDirectory;
+
+        ExportJson = persisted.ExportJson;
+        ExportXml = persisted.ExportXml;
+        ExportMarkdown = persisted.ExportMarkdown;
+        EnableCompression = persisted.EnableCompression;
+        SkipDiagnostics = persisted.SkipDiagnostics;
+
+        foreach (var directory in persisted.RecentOutputDirectories)
+        {
+            AddRecentOutputDirectory(directory);
+        }
+    }
+
+    private async Task SavePersistedSettingsAsync(CancellationToken cancellationToken)
+    {
+        var persisted = new PersistedExporterSettings
+        {
+            LastProjectPath = ProjectPath,
+            LastOutputDirectory = OutputDirectory,
+            ExportJson = ExportJson,
+            ExportXml = ExportXml,
+            ExportMarkdown = ExportMarkdown,
+            EnableCompression = EnableCompression,
+            SkipDiagnostics = SkipDiagnostics,
+            RecentOutputDirectories = RecentOutputDirectories.ToList()
+        };
+
+        await _settingsStore.SaveAsync(persisted, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void AddRecentOutputDirectory(string? directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return;
+        }
+
+        var existingIndex = RecentOutputDirectories
+            .Select((value, index) => new { Value = value, Index = index })
+            .FirstOrDefault(entry => string.Equals(entry.Value, directory, StringComparison.OrdinalIgnoreCase))
+            ?.Index;
+
+        if (existingIndex is int index)
+        {
+            RecentOutputDirectories.RemoveAt(index);
+        }
+
+        RecentOutputDirectories.Insert(0, directory);
+
+        while (RecentOutputDirectories.Count > MaxRecentOutputDirectories)
+        {
+            RecentOutputDirectories.RemoveAt(RecentOutputDirectories.Count - 1);
+        }
+    }
 
     private Task HandleCommandExceptionAsync(Exception exception)
     {

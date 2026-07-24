@@ -69,7 +69,9 @@
 
                     <TextBlock Margin="0,16,0,4"
                                Text="Output Folder" />
-                    <TextBox Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" />
+                    <ComboBox IsEditable="True"
+                              ItemsSource="{Binding RecentOutputDirectories}"
+                              Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" />
 
                     <TextBlock Margin="0,16,0,6"
                                Text="Formats" />

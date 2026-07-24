@@ -46,7 +46,6 @@ Scope:
 ## TODO List
 
 - Implement a concrete Siemens Openness-backed inventory provider for project metadata, device tree, and software discovery.
-- Add configuration persistence for recent output folders and export format selections.
 - Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
 - Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
 
@@ -75,12 +74,15 @@ Scope:
 - Added export cancellation support in the WPF MVVM workflow with `CancelExportCommand`, cooperative `CancellationTokenSource` handling, and cancellation-specific UI status updates.
 - Added unit tests for repository layout generation and non-Windows TIA installation discovery behavior.
 - Expanded automated validation to 10 passing xUnit tests in `TiaProjectExporter.Tests`.
+- Added user settings persistence (`LocalApplicationData/TiaProjectExporter/user-settings.json`) for output folder history, project path, and export option selections.
+- Updated the output folder input to an editable history-backed combobox and persisted settings during export completion and application shutdown.
 
 ## Known Issues
 
 - TIA Portal Openness assemblies are Windows-only and cannot be executed in the current Linux workspace.
 - WPF build/runtime verification still needs confirmation on a Windows machine with the Windows Desktop workload installed.
 - WPF cancellation behavior is implemented but still requires Windows runtime validation against real long-running export stages.
+- Recent output folder history behavior still needs UX validation on Windows for long path editing and combobox interaction.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
 - TIA project inventory export currently emits placeholder availability/status artifacts until the Siemens Openness adapter is implemented.
 - Siemens.Engineering integration is still pending; current Openness adapter intentionally returns structured placeholder issues.

@@ -38,6 +38,7 @@ public partial class App : System.Windows.Application
                 context.Configuration.GetSection("Exporter").Bind(exporterSettings);
 
                 services.AddSingleton(exporterSettings);
+                services.AddSingleton<IExporterSettingsStore, JsonExporterSettingsStore>();
                 services.AddApplicationServices();
                 services.AddInfrastructure();
                 services.AddTiaServices();
@@ -67,6 +68,8 @@ public partial class App : System.Windows.Application
     {
         if (_host is not null)
         {
+            var viewModel = _host.Services.GetRequiredService<MainWindowViewModel>();
+            await viewModel.PersistSettingsAsync(CancellationToken.None).ConfigureAwait(true);
             await _host.StopAsync().ConfigureAwait(true);
             _host.Dispose();
         }
