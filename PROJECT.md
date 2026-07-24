@@ -47,7 +47,6 @@ Scope:
 
 - Implement a concrete Siemens Openness-backed inventory provider for project metadata, device tree, and software discovery.
 - Add configuration persistence for recent output folders and export format selections.
-- Add unit tests for repository layout generation and TIA installation discovery edge cases.
 - Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
 - Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
 
@@ -74,6 +73,8 @@ Scope:
 - Added a placeholder `UnavailableTiaProjectOpennessAdapter` to keep non-Windows and non-Siemens environments functional while preserving architecture boundaries.
 - Added xUnit coverage for inventory provider status mapping (missing path, partial traversal, traversal failure).
 - Added export cancellation support in the WPF MVVM workflow with `CancelExportCommand`, cooperative `CancellationTokenSource` handling, and cancellation-specific UI status updates.
+- Added unit tests for repository layout generation and non-Windows TIA installation discovery behavior.
+- Expanded automated validation to 10 passing xUnit tests in `TiaProjectExporter.Tests`.
 
 ## Known Issues
 
