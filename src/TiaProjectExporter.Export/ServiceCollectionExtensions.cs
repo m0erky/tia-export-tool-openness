@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IExportStage, MultilingualTextStage>();
         services.AddSingleton<IExportStage, ExportReportStage>();
         services.AddSingleton<IExportStage, ExportIndexStage>();
+        services.AddSingleton<IExportStage, CompressionStage>();
         return services;
     }
 }

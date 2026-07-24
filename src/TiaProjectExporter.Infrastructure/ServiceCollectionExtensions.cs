@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IExportArtifactWriterFactory, FileSystemExportArtifactWriterFactory>();
+        services.AddSingleton<IExportArchiveService, ZipExportArchiveService>();
         return services;
     }
 }

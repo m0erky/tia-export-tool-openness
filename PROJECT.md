@@ -91,6 +91,8 @@ Scope:
 - Enhanced `PROJECT_OVERVIEW.md` generation with an analysis aggregator hub that summarizes produced analysis artifacts, key inventory statistics, and dominant object types for faster LLM orientation.
 - Added `MultilingualTextStage` that exports centralized multilingual text metadata into `Export/Metadata/MULTILINGUAL_TEXTS.json` and `Export/Metadata/MULTILINGUAL_TEXTS.md` for AI-friendly localization/context analysis.
 - Expanded automated validation to 16 passing xUnit tests.
+- Added compression packaging support via `CompressionStage` and `ZipExportArchiveService` to generate `Export.zip` when `EnableCompression=true`.
+- Expanded automated validation to 18 passing xUnit tests.
 
 ## Known Issues
 
@@ -105,6 +107,7 @@ Scope:
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.
 - Tag usage and unused-object detection currently rely on metadata heuristics and still require deeper Siemens semantic references for higher precision.
 - Multilingual extraction currently relies on metadata key heuristics and should be extended with direct Siemens language-resource APIs when full traversal is available.
+- ZIP packaging has Linux test coverage but still needs end-to-end Windows validation with real large TIA exports.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements
