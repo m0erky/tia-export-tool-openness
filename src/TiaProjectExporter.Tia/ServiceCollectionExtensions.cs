@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTiaServices(this IServiceCollection services)
     {
         services.AddSingleton<ITiaInstallationDiscoveryService, RegistryTiaInstallationDiscoveryService>();
+        services.AddSingleton<ITiaDomainExtractor, ProjectHierarchyDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, TechnologyDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, HardwareDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, NetworkDomainExtractor>();

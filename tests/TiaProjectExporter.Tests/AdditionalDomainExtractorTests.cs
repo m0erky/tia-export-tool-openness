@@ -109,6 +109,23 @@ public sealed class AdditionalDomainExtractorTests
         Assert.Contains("PLC_1", node.Metadata?["Dependencies"]);
     }
 
+    [Fact]
+    public void ProjectHierarchyDomainExtractor_ExtractsDeviceGroup()
+    {
+        var extractor = new ProjectHierarchyDomainExtractor();
+        var runtime = new DeviceGroupRuntime
+        {
+            Name = "LineA"
+        };
+
+        var node = extractor.TryExtract(runtime, "Project/Groups/LineA", 2);
+
+        Assert.NotNull(node);
+        Assert.Equal("DeviceGroup", node.ObjectType);
+        Assert.Equal("Project", node.Metadata?["Domain"]);
+        Assert.Equal("true", node.Metadata?["Hierarchy"]);
+    }
+
     private sealed class NamedNode
     {
         public NamedNode(string name)
@@ -157,5 +174,10 @@ public sealed class AdditionalDomainExtractorTests
         public string? Name { get; init; }
 
         public IEnumerable<NamedNode>? Connections { get; init; }
+    }
+
+    private sealed class DeviceGroupRuntime
+    {
+        public string? Name { get; init; }
     }
 }

@@ -408,12 +408,66 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
 
             if (extractedNode is not null)
             {
-                return extractedNode;
+                return MarkTypedExtraction(extractedNode, extractor);
             }
         }
 
-        return null;
+        return TryFallbackExtraction(runtimeNode, runtimeTypeName, qualifiedPath, depth);
     }
+
+    private static TiaProjectObjectNode MarkTypedExtraction(TiaProjectObjectNode node, ITiaDomainExtractor extractor)
+    {
+        var metadata = new Dictionary<string, string>(node.Metadata ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase)
+        {
+            ["ExtractedByTypedExtractor"] = "true",
+            ["TypedExtractor"] = extractor.GetType().Name,
+            ["FallbackReflectionUsed"] = "false"
+        };
+
+        return node with { Metadata = metadata };
+    }
+
+    private static TiaProjectObjectNode? TryFallbackExtraction(
+        object runtimeNode,
+        string runtimeTypeName,
+        string qualifiedPath,
+        int depth)
+    {
+        if (!ShouldFallbackExtract(runtimeTypeName))
+        {
+            return null;
+        }
+
+        var name = TryReadString(runtimeNode, "Name")
+            ?? TryReadString(runtimeNode, "DisplayName")
+            ?? runtimeTypeName;
+
+        var metadata = new Dictionary<string, string>(ReflectionNodeIntrospection.BuildCommonMetadata(runtimeNode, "Unknown"), StringComparer.OrdinalIgnoreCase)
+        {
+            ["Domain"] = "Unmapped",
+            ["ExtractionStrategy"] = "ReflectionFallback",
+            ["ExtractedByTypedExtractor"] = "false",
+            ["FallbackReflectionUsed"] = "true"
+        };
+
+        return new TiaProjectObjectNode(
+            ObjectType: "UnmappedRuntimeNode",
+            Name: name,
+            QualifiedPath: qualifiedPath,
+            Depth: depth,
+            Metadata: metadata);
+    }
+
+    private static bool ShouldFallbackExtract(string runtimeTypeName) =>
+        runtimeTypeName.Contains("Group", StringComparison.OrdinalIgnoreCase)
+        || runtimeTypeName.Contains("Folder", StringComparison.OrdinalIgnoreCase)
+        || runtimeTypeName.Contains("Node", StringComparison.OrdinalIgnoreCase)
+        || runtimeTypeName.Contains("Container", StringComparison.OrdinalIgnoreCase)
+        || runtimeTypeName.Contains("Technology", StringComparison.OrdinalIgnoreCase)
+        || runtimeTypeName.Contains("Hmi", StringComparison.OrdinalIgnoreCase)
+        || runtimeTypeName.Contains("Library", StringComparison.OrdinalIgnoreCase)
+        || runtimeTypeName.Contains("Network", StringComparison.OrdinalIgnoreCase)
+        || runtimeTypeName.Contains("Device", StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<object> EnumerateChildObjects(object parent)
     {

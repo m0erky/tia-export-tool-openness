@@ -27,12 +27,16 @@ public sealed class ExportCoverageMatrixStageTests
                 new TiaProjectObjectNode("OB", "OB1", "Project/PLC/Blocks/OB1", 2, new Dictionary<string, string>
                 {
                     ["Domain"] = "PLC.Blocks",
-                    ["ExtractionConfidence"] = "0.92"
+                    ["ExtractionConfidence"] = "0.92",
+                    ["ExtractedByTypedExtractor"] = "true",
+                    ["FallbackReflectionUsed"] = "false"
                 }),
                 new TiaProjectObjectNode("Tag", "Tag_Start", "Project/PLC/Tags/Tag_Start", 2, new Dictionary<string, string>
                 {
                     ["Domain"] = "PLC.Tags",
-                    ["ExtractionConfidence"] = "0.55"
+                    ["ExtractionConfidence"] = "0.55",
+                    ["ExtractedByTypedExtractor"] = "false",
+                    ["FallbackReflectionUsed"] = "true"
                 })
             ],
             Issues: new[]
@@ -50,6 +54,8 @@ public sealed class ExportCoverageMatrixStageTests
         using var document = JsonDocument.Parse(jsonArtifact.Content);
         Assert.True(document.RootElement.TryGetProperty("domains", out var domains));
         Assert.True(domains.GetArrayLength() >= 10);
+        Assert.True(document.RootElement.GetProperty("summary").GetProperty("typedExtractorDomains").GetInt32() >= 1);
+        Assert.True(document.RootElement.GetProperty("summary").GetProperty("fallbackDomains").GetInt32() >= 1);
         Assert.Contains("PLC.Blocks", markdownArtifact.Content, StringComparison.Ordinal);
     }
 

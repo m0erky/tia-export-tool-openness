@@ -12,6 +12,22 @@ namespace TiaProjectExporter.Export.Stages;
 /// </summary>
 public sealed class ExportCoverageMatrixStage : IExportStage
 {
+    private static readonly IReadOnlyDictionary<string, bool> SupportedByApiMap = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Project"] = true,
+        ["Hardware"] = true,
+        ["Network"] = true,
+        ["PLC.Blocks"] = true,
+        ["PLC.Tags"] = true,
+        ["PLC.DataTypes"] = true,
+        ["HMI"] = true,
+        ["Libraries"] = true,
+        ["Diagnostics"] = true,
+        ["Technology"] = true,
+        ["Metadata"] = false,
+        ["UsersAudit"] = true
+    };
+
     private static readonly string[] DomainOrder =
     [
         "Project",
@@ -56,7 +72,9 @@ public sealed class ExportCoverageMatrixStage : IExportStage
                     CompleteCandidate = entries.Count(entry => entry.Status == "CompleteCandidate"),
                     PartialCandidate = entries.Count(entry => entry.Status == "PartialCandidate"),
                     LowConfidence = entries.Count(entry => entry.Status == "LowConfidence"),
-                    NotDiscovered = entries.Count(entry => entry.Status == "NotDiscovered")
+                    NotDiscovered = entries.Count(entry => entry.Status == "NotDiscovered"),
+                    TypedExtractorDomains = entries.Count(entry => entry.ExtractedByTypedExtractor),
+                    FallbackDomains = entries.Count(entry => entry.FallbackReflectionUsed)
                 }
             };
 
@@ -95,6 +113,18 @@ public sealed class ExportCoverageMatrixStage : IExportStage
                 issue.Scope.Contains(domain, StringComparison.OrdinalIgnoreCase)
                 || issue.Message.Contains(domain, StringComparison.OrdinalIgnoreCase));
 
+            var typedCount = domainNodes.Count(node =>
+                node.Metadata is not null
+                && node.Metadata.TryGetValue("ExtractedByTypedExtractor", out var raw)
+                && bool.TryParse(raw, out var extractedByTyped)
+                && extractedByTyped);
+
+            var fallbackCount = domainNodes.Count(node =>
+                node.Metadata is not null
+                && node.Metadata.TryGetValue("FallbackReflectionUsed", out var raw)
+                && bool.TryParse(raw, out var fallback)
+                && fallback);
+
             var status = discovered == 0
                 ? "NotDiscovered"
                 : confident == discovered
@@ -103,7 +133,19 @@ public sealed class ExportCoverageMatrixStage : IExportStage
                         ? "PartialCandidate"
                         : "LowConfidence";
 
-            yield return new CoverageEntry(domain, discovered, confident, issues, status);
+            var supportedByApi = SupportedByApiMap.TryGetValue(domain, out var supported) && supported;
+
+            yield return new CoverageEntry(
+                Domain: domain,
+                SupportedByApi: supportedByApi,
+                Discovered: discovered,
+                HighConfidence: confident,
+                TypedCount: typedCount,
+                FallbackCount: fallbackCount,
+                Issues: issues,
+                Status: status,
+                ExtractedByTypedExtractor: typedCount > 0,
+                FallbackReflectionUsed: fallbackCount > 0);
         }
     }
 
@@ -152,12 +194,12 @@ public sealed class ExportCoverageMatrixStage : IExportStage
         builder.AppendLine();
         builder.AppendLine($"Inventory status: **{inventory.Status}**");
         builder.AppendLine();
-        builder.AppendLine("| Domain | Discovered | High Confidence | Issues | Status |");
-        builder.AppendLine("| --- | ---: | ---: | ---: | --- |");
+        builder.AppendLine("| Domain | API | Discovered | High Conf. | Typed | Fallback | Issues | Status |");
+        builder.AppendLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |");
 
         foreach (var entry in entries)
         {
-            builder.AppendLine($"| {entry.Domain} | {entry.Discovered} | {entry.HighConfidence} | {entry.Issues} | {entry.Status} |");
+            builder.AppendLine($"| {entry.Domain} | {(entry.SupportedByApi ? "Yes" : "No")} | {entry.Discovered} | {entry.HighConfidence} | {entry.TypedCount} | {entry.FallbackCount} | {entry.Issues} | {entry.Status} |");
         }
 
         builder.AppendLine();
@@ -167,14 +209,21 @@ public sealed class ExportCoverageMatrixStage : IExportStage
         builder.AppendLine("- **PartialCandidate**: discovered objects with mixed confidence.");
         builder.AppendLine("- **LowConfidence**: discovered objects with no high-confidence entries.");
         builder.AppendLine("- **NotDiscovered**: no objects discovered for the domain in current export.");
+        builder.AppendLine("- **Typed**: objects produced by explicit typed extractor mappings.");
+        builder.AppendLine("- **Fallback**: objects produced by generic reflection fallback extraction.");
 
         return builder.ToString();
     }
 
     private sealed record CoverageEntry(
         string Domain,
+        bool SupportedByApi,
         int Discovered,
         int HighConfidence,
+        int TypedCount,
+        int FallbackCount,
         int Issues,
-        string Status);
+        string Status,
+        bool ExtractedByTypedExtractor,
+        bool FallbackReflectionUsed);
 }

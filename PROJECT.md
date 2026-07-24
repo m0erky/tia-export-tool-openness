@@ -106,6 +106,9 @@ Scope:
 - Added focused extractor unit tests for library type versions, diagnostics severity extraction, and user-role mapping.
 - Added explicit `TechnologyDomainExtractor` plus deep HMI extractor split (`HmiScreenFaceplateDomainExtractor`, `HmiRecipeAlarmScriptDomainExtractor`) for finer-grained structured extraction of motion/safety/PID and HMI artifacts.
 - Expanded extractor unit tests with technology and deep-HMI cases (safety axis, faceplate, recipe dependency).
+- Added explicit `ProjectHierarchyDomainExtractor` for project tree/group/folder structure extraction (including device-group mapping).
+- Enhanced extraction metadata with explicit capability flags (`ExtractedByTypedExtractor`, `FallbackReflectionUsed`) and added reflection fallback node capture for unmapped runtime nodes.
+- Extended coverage matrix artifacts to include API support and extraction-mode dimensions (`SupportedByApi`, typed counts, fallback counts).
 
 ## Known Issues
 
@@ -129,6 +132,7 @@ Scope:
 - Network/hardware extractor classification is currently heuristic by runtime type names and should be hardened against real V18/V19/V20 runtime type catalogs.
 - Library/diagnostics/users-audit extraction is currently heuristic by runtime type names and should be validated against real Siemens Openness type hierarchies per TIA version.
 - Technology/HMI-deep extractors are currently heuristic by runtime type names and should be validated/tuned against real WinCC and technology object models in V18/V19/V20.
+- Fallback extraction currently classifies unmapped runtime nodes as generic `UnmappedRuntimeNode`; domain-specific typed mappings should continue replacing fallback paths over time.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements
