@@ -14,6 +14,7 @@ public sealed class ExportExecutionContext
     private readonly List<ExportedObjectResult> _results = [];
     private readonly List<ExportedArtifactInfo> _artifacts = [];
     private readonly HashSet<string> _directories = new(StringComparer.OrdinalIgnoreCase);
+    private TiaProjectInventory? _inventory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ExportExecutionContext"/> class.
@@ -52,6 +53,11 @@ public sealed class ExportExecutionContext
     public IReadOnlyCollection<string> Directories => _directories;
 
     /// <summary>
+    /// Gets the latest inventory snapshot produced during the run.
+    /// </summary>
+    public TiaProjectInventory? Inventory => _inventory;
+
+    /// <summary>
     /// Gets the selected export options.
     /// </summary>
     public ExportOptions Options { get; }
@@ -85,6 +91,11 @@ public sealed class ExportExecutionContext
     /// Adds a recoverable issue.
     /// </summary>
     public void AddIssue(ExportIssue issue) => _issues.Add(issue);
+
+    /// <summary>
+    /// Stores the latest inventory snapshot for downstream stages.
+    /// </summary>
+    public void SetInventory(TiaProjectInventory inventory) => _inventory = inventory;
 
     /// <summary>
     /// Ensures a directory and records it in the execution snapshot.

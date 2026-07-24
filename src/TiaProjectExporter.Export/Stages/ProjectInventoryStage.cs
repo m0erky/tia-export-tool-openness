@@ -30,6 +30,7 @@ public sealed class ProjectInventoryStage : IExportStage
     public async Task ExecuteAsync(ExportExecutionContext context, CancellationToken cancellationToken)
     {
         var inventory = await _inventoryProvider.BuildInventoryAsync(context.Options.ProjectPath, cancellationToken).ConfigureAwait(false);
+        context.SetInventory(inventory);
         var jsonOptions = JsonOptionsFactory.CreateDefault();
 
         var inventoryJson = JsonSerializer.Serialize(inventory, jsonOptions);
