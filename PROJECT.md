@@ -154,6 +154,7 @@ Scope:
 - Added unit tests for domain extractor coverage artifact generation and gap detection output.
 - Updated `README.md` to document the new domain extractor coverage artifacts and capability.
 - Added `ExecutiveSummaryStage` to generate `Export/EXECUTIVE_SUMMARY.md` and `Export/Reports/EXECUTIVE_SUMMARY.json`, consolidating run health, domain distribution, priority actions, and key artifacts.
+- Fixed `ExecutiveSummaryStage` JSON payload naming collision in anonymous totals object (`ResultCount`/`IssueCount`) and aligned tests.
 - Improved relationship target resolution by introducing shared normalization/resolution logic across dependency/readiness/insight/backlog/action stages.
 - Expanded typed extraction coverage with new `MetadataDomainExtractor` and `HmiConnectionArchiveDomainExtractor` plus registration and unit tests.
 - Added Windows validation workflow assets: `docs/WINDOWS_VALIDATION.md` and `scripts/validate-windows.ps1` for repeatable VS2022/TIA validation passes.

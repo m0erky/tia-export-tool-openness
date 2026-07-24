@@ -102,11 +102,11 @@ public sealed class ExecutiveSummaryStage : IExportStage
             DurationSeconds = Math.Round((report.FinishedAt - report.StartedAt).TotalSeconds, 2),
             Totals = new
             {
-                report.Results.Count,
+                ResultCount = report.Results.Count,
                 report.SucceededCount,
                 report.FailedCount,
                 report.SkippedCount,
-                report.Issues.Count
+                IssueCount = report.Issues.Count
             },
             Inventory = new
             {

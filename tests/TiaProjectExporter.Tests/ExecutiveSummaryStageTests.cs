@@ -53,7 +53,7 @@ public sealed class ExecutiveSummaryStageTests
         Assert.Contains("fallback extraction", markdown.Content, StringComparison.OrdinalIgnoreCase);
 
         using var document = JsonDocument.Parse(json.Content);
-        Assert.True(document.RootElement.GetProperty("totals").GetProperty("count").GetInt32() >= 1);
+        Assert.True(document.RootElement.GetProperty("totals").GetProperty("resultCount").GetInt32() >= 1);
         var priorities = document.RootElement.GetProperty("priorities").EnumerateArray().ToArray();
         Assert.NotEmpty(priorities);
     }
