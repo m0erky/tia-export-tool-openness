@@ -46,7 +46,7 @@ Scope:
 ## TODO List
 
 - Define `ITiaProjectOpennessAdapter` and traversal abstractions for project/object enumeration.
-- Implement the first TIA project inventory stage that exports discovered project metadata and object counts.
+- Implement a concrete Siemens Openness-backed inventory provider for project metadata, device tree, and software discovery.
 - Generate real `EXPORT_REPORT.md`, `PROJECT_STATISTICS.json`, and `PROJECT_OVERVIEW.md` content from execution results.
 - Add cancellation support through the UI workflow.
 - Add configuration persistence for recent output folders and export format selections.
@@ -66,6 +66,8 @@ Scope:
 - Implemented Windows registry-based discovery abstraction for supported TIA Portal V18/V19/V20 installations.
 - Added the first WPF MVVM shell with dependency injection, configuration loading, logging, progress display, statistics, and installed-version detection.
 - Added initial xUnit tests for pipeline resilience and progress propagation.
+- Added TIA project inventory contracts plus an inventory export stage that emits structured JSON/XML/Markdown status artifacts.
+- Extended the UI with a source TIA project path field so the next milestone can attach real project traversal.
 
 ## Known Issues
 
@@ -73,7 +75,7 @@ Scope:
 - TIA Portal Openness assemblies are Windows-only and cannot be executed in the current Linux workspace.
 - WPF build/runtime verification still needs confirmation on a Windows machine with the Windows Desktop workload installed.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
-- Exported repository files are still placeholder summaries until real TIA project traversal is implemented.
+- TIA project inventory export currently emits placeholder availability/status artifacts until the Siemens Openness adapter is implemented.
 
 ## Future Improvements
 

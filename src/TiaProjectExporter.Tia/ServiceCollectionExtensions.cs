@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Tia.Discovery;
+using TiaProjectExporter.Tia.Inventory;
 
 namespace TiaProjectExporter.Tia;
 
@@ -15,6 +16,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTiaServices(this IServiceCollection services)
     {
         services.AddSingleton<ITiaInstallationDiscoveryService, RegistryTiaInstallationDiscoveryService>();
+        services.AddSingleton<ITiaProjectInventoryProvider, UnavailableTiaProjectInventoryProvider>();
         return services;
     }
 }

@@ -16,6 +16,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly ITiaInstallationDiscoveryService _installationDiscoveryService;
     private readonly ExportCoordinator _exportCoordinator;
     private readonly UiLogCollector _logCollector;
+    private string _projectPath = string.Empty;
     private string _outputDirectory;
     private bool _exportJson = true;
     private bool _exportXml = true;
@@ -88,6 +89,15 @@ public sealed class MainWindowViewModel : ObservableObject
                 ExportCommand.RaiseCanExecuteChanged();
             }
         }
+    }
+
+    /// <summary>
+    /// Gets or sets the source TIA project path.
+    /// </summary>
+    public string ProjectPath
+    {
+        get => _projectPath;
+        set => SetProperty(ref _projectPath, value);
     }
 
     /// <summary>
@@ -235,6 +245,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ProgressPercent = 0;
 
         var options = new ExportOptions(
+            string.IsNullOrWhiteSpace(ProjectPath) ? null : ProjectPath,
             OutputDirectory,
             BuildFormats(),
             EnableCompression,

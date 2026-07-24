@@ -4,6 +4,7 @@ namespace TiaProjectExporter.Core.Models;
 /// User-selected options that control export output.
 /// </summary>
 public sealed record ExportOptions(
+    string? ProjectPath,
     string OutputDirectory,
     IReadOnlyCollection<ExportFormat> Formats,
     bool EnableCompression,
@@ -15,10 +16,10 @@ public sealed record ExportOptions(
     /// </summary>
     public static ExportOptions CreateDefault(string outputDirectory) =>
         new(
-            outputDirectory,
-            new[] { ExportFormat.Json, ExportFormat.Xml, ExportFormat.Markdown },
+            ProjectPath: null,
+            OutputDirectory: outputDirectory,
+            Formats: new[] { ExportFormat.Json, ExportFormat.Xml, ExportFormat.Markdown },
             EnableCompression: false,
             SkipDiagnostics: false,
             GenerateMarkdownSummaries: true);
 }
-

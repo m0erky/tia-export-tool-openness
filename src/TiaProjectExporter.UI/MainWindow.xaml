@@ -64,6 +64,10 @@
                                Text="Export Settings" />
 
                     <TextBlock Margin="0,16,0,4"
+                               Text="TIA Project Path" />
+                    <TextBox Text="{Binding ProjectPath, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Margin="0,16,0,4"
                                Text="Output Folder" />
                     <TextBox Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" />
 
@@ -212,4 +216,3 @@
                    Text="Milestone 1 provides repository skeleton export, resilient pipeline orchestration, and initial TIA installation detection." />
     </Grid>
 </Window>
-
