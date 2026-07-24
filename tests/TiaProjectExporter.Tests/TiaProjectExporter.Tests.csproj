@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\TiaProjectExporter.Core\TiaProjectExporter.Core.csproj" />
     <ProjectReference Include="..\..\src\TiaProjectExporter.Application\TiaProjectExporter.Application.csproj" />
+    <ProjectReference Include="..\..\src\TiaProjectExporter.Export\TiaProjectExporter.Export.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -14,5 +15,9 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
   </ItemGroup>
 </Project>

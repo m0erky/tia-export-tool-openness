@@ -68,10 +68,11 @@ Scope:
 - Added initial xUnit tests for pipeline resilience and progress propagation.
 - Added TIA project inventory contracts plus an inventory export stage that emits structured JSON/XML/Markdown status artifacts.
 - Extended the UI with a source TIA project path field so the next milestone can attach real project traversal.
+- Fixed the test project references/imports so Linux-based non-WPF test execution works with the .NET 8 SDK.
+- Verified `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj` passes on Ubuntu 24.04 with .NET SDK 8.0.129.
 
 ## Known Issues
 
-- The current workspace does not contain the `.NET` SDK, so restore/build/test verification could not be executed locally.
 - TIA Portal Openness assemblies are Windows-only and cannot be executed in the current Linux workspace.
 - WPF build/runtime verification still needs confirmation on a Windows machine with the Windows Desktop workload installed.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
@@ -100,4 +101,8 @@ Windows-specific notes:
 
 - The UI project targets WPF and should be built on Windows with the .NET 8 SDK and Windows Desktop workload available.
 - TIA Openness integration requires Siemens TIA Portal installations and compatible Openness assemblies for V18/V19/V20.
-- The current development workspace used for this milestone did not have `dotnet` installed, so these commands were not executed here.
+- Linux verification command used successfully in this workspace:
+
+```bash
+DOTNET_CLI_HOME=/tmp DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj
+```
