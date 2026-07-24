@@ -78,6 +78,7 @@ Scope:
 - Updated the output folder input to an editable history-backed combobox and persisted settings during export completion and application shutdown.
 - Replaced the placeholder Openness adapter with a reflection-safe runtime probe that selects supported installed versions (V18/V19/V20), resolves Siemens.Engineering assembly candidates, and returns structured issues instead of crashing.
 - Added non-Windows adapter safety test coverage and expanded automated validation to 11 passing xUnit tests.
+- Extended the Openness adapter to attempt real runtime operations through reflection: create `TiaPortal` (without UI), open the selected project, and enumerate top-level devices with resilient fallback issue reporting.
 
 ## Known Issues
 
@@ -87,6 +88,7 @@ Scope:
 - Recent output folder history behavior still needs UX validation on Windows for long path editing and combobox interaction.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
 - Full Siemens.Engineering object traversal is still pending; the current adapter validates runtime availability and reports structured readiness issues.
+- Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - `FILE_INDEX.json`, `SEARCH_INDEX.json`, and `BLOCK_CALL_GRAPH.md` are still placeholder-first and need deep object-level export data.
 
 ## Future Improvements

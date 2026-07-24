@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using TiaProjectExporter.Application.Abstractions;
@@ -103,53 +104,236 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
                 Issues: issues);
         }
 
-        try
-        {
-            var assembly = Assembly.LoadFrom(assemblyPath);
-            var tiaPortalType = assembly.GetType("Siemens.Engineering.TiaPortal");
-            var projectsType = assembly.GetType("Siemens.Engineering.Project");
-
-            if (tiaPortalType is null || projectsType is null)
-            {
-                issues.Add(new ExportIssue(
-                    "OpennessRuntime",
-                    "Loaded Siemens.Engineering assembly does not expose expected public types.",
-                    $"Assembly: {assembly.FullName}"));
-            }
-            else
-            {
-                objects.Add(new TiaProjectObjectNode(
-                    ObjectType: "OpennessRuntime",
-                    Name: preferredInstallation.DisplayName,
-                    QualifiedPath: "Project/OpennessRuntime",
-                    Depth: 1,
-                    Metadata: new Dictionary<string, string>
-                    {
-                        ["Version"] = preferredInstallation.Version.ToString(),
-                        ["AssemblyPath"] = assemblyPath,
-                        ["AssemblyName"] = assembly.GetName().Name ?? "Unknown"
-                    }));
-
-                issues.Add(new ExportIssue(
-                    "OpennessTraversal",
-                    "Siemens.Engineering runtime probe succeeded but deep project traversal is not yet implemented.",
-                    "Next step: instantiate TiaPortal and map devices, PLC software, HMI, network, and metadata objects."));
-            }
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(exception, "Failed to load Siemens.Engineering assembly from {AssemblyPath}", assemblyPath);
-            issues.Add(new ExportIssue(
-                "OpennessRuntime",
-                "Failed to load Siemens.Engineering assembly for traversal.",
-                exception.Message));
-        }
+        ProbeRuntimeAndTraverseProject(
+            preferredInstallation,
+            assemblyPath,
+            projectPath,
+            objects,
+            issues,
+            cancellationToken);
 
         return new TiaProjectTraversalResult(
             ProjectName: Path.GetFileNameWithoutExtension(projectPath),
             ProjectPath: projectPath,
             Objects: objects,
             Issues: issues);
+    }
+
+    private void ProbeRuntimeAndTraverseProject(
+        DiscoveredTiaPortalInstallation installation,
+        string assemblyPath,
+        string projectPath,
+        ICollection<TiaProjectObjectNode> objects,
+        ICollection<ExportIssue> issues,
+        CancellationToken cancellationToken)
+    {
+        object? tiaPortal = null;
+        object? project = null;
+
+        try
+        {
+            var assembly = Assembly.LoadFrom(assemblyPath);
+            var tiaPortalType = assembly.GetType("Siemens.Engineering.TiaPortal");
+            var modeType = assembly.GetType("Siemens.Engineering.TiaPortalMode");
+
+            if (tiaPortalType is null || modeType is null)
+            {
+                issues.Add(new ExportIssue(
+                    "OpennessRuntime",
+                    "Loaded Siemens.Engineering assembly does not expose expected TiaPortal types.",
+                    $"Assembly: {assembly.FullName}"));
+                return;
+            }
+
+            var mode = ResolvePortalMode(modeType);
+            tiaPortal = Activator.CreateInstance(tiaPortalType, mode);
+
+            if (tiaPortal is null)
+            {
+                issues.Add(new ExportIssue(
+                    "OpennessRuntime",
+                    "Unable to create Siemens TiaPortal runtime instance.",
+                    "Activator returned null for Siemens.Engineering.TiaPortal."));
+                return;
+            }
+
+            objects.Add(new TiaProjectObjectNode(
+                ObjectType: "OpennessRuntime",
+                Name: installation.DisplayName,
+                QualifiedPath: "Project/OpennessRuntime",
+                Depth: 1,
+                Metadata: new Dictionary<string, string>
+                {
+                    ["Version"] = installation.Version.ToString(),
+                    ["AssemblyPath"] = assemblyPath,
+                    ["AssemblyName"] = assembly.GetName().Name ?? "Unknown"
+                }));
+
+            project = TryOpenProject(tiaPortal, projectPath);
+
+            if (project is null)
+            {
+                issues.Add(new ExportIssue(
+                    "OpennessTraversal",
+                    "Could not open project through Siemens Openness runtime.",
+                    "The selected project may require a different TIA version or access mode."));
+                return;
+            }
+
+            TraverseProjectRoot(project, objects, issues, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed Siemens Openness traversal for project {ProjectPath}", projectPath);
+            issues.Add(new ExportIssue(
+                "OpennessTraversal",
+                "Siemens Openness traversal failed.",
+                exception.Message));
+        }
+        finally
+        {
+            TryCloseProject(project);
+            TryDispose(project);
+            TryDispose(tiaPortal);
+        }
+    }
+
+    private static object ResolvePortalMode(Type modeType)
+    {
+        try
+        {
+            return Enum.Parse(modeType, "WithoutUserInterface", ignoreCase: true);
+        }
+        catch
+        {
+            var values = Enum.GetValues(modeType);
+            return values.Length > 0
+                ? values.GetValue(0)!
+                : throw new InvalidOperationException("No TiaPortalMode values are available.");
+        }
+    }
+
+    private static object? TryOpenProject(object tiaPortal, string projectPath)
+    {
+        var projectsProperty = tiaPortal.GetType().GetProperty("Projects", BindingFlags.Public | BindingFlags.Instance);
+        var projects = projectsProperty?.GetValue(tiaPortal);
+
+        if (projects is null)
+        {
+            return null;
+        }
+
+        var openMethod = projects.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(method =>
+                method.Name == "Open" &&
+                method.GetParameters().Length == 1);
+
+        if (openMethod is null)
+        {
+            return null;
+        }
+
+        var parameterType = openMethod.GetParameters()[0].ParameterType;
+        object argument = parameterType == typeof(FileInfo)
+            ? new FileInfo(projectPath)
+            : projectPath;
+
+        return openMethod.Invoke(projects, [argument]);
+    }
+
+    private static void TraverseProjectRoot(
+        object project,
+        ICollection<TiaProjectObjectNode> objects,
+        ICollection<ExportIssue> issues,
+        CancellationToken cancellationToken)
+    {
+        var projectName = project.GetType().GetProperty("Name", BindingFlags.Public | BindingFlags.Instance)?.GetValue(project)?.ToString();
+
+        if (!string.IsNullOrWhiteSpace(projectName))
+        {
+            objects.Add(new TiaProjectObjectNode(
+                ObjectType: "ProjectMetadata",
+                Name: projectName,
+                QualifiedPath: "Project/Metadata",
+                Depth: 1,
+                Metadata: new Dictionary<string, string>
+                {
+                    ["RuntimeType"] = project.GetType().FullName ?? "Unknown"
+                }));
+        }
+
+        var devicesProperty = project.GetType().GetProperty("Devices", BindingFlags.Public | BindingFlags.Instance);
+        var devicesValue = devicesProperty?.GetValue(project);
+
+        if (devicesValue is not IEnumerable devices)
+        {
+            issues.Add(new ExportIssue(
+                "OpennessTraversal",
+                "Project device composition was not available through reflection.",
+                "The runtime object model may differ for this TIA version."));
+            return;
+        }
+
+        var deviceCount = 0;
+
+        foreach (var device in devices)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var deviceName = device?.GetType().GetProperty("Name", BindingFlags.Public | BindingFlags.Instance)?.GetValue(device)?.ToString();
+
+            if (string.IsNullOrWhiteSpace(deviceName))
+            {
+                continue;
+            }
+
+            var runtimeType = device?.GetType().FullName ?? "Unknown";
+
+            objects.Add(new TiaProjectObjectNode(
+                ObjectType: "Device",
+                Name: deviceName,
+                QualifiedPath: $"Project/Devices/{deviceName}",
+                Depth: 2,
+                Metadata: new Dictionary<string, string>
+                {
+                    ["RuntimeType"] = runtimeType
+                }));
+
+            deviceCount++;
+        }
+
+        if (deviceCount == 0)
+        {
+            issues.Add(new ExportIssue(
+                "OpennessTraversal",
+                "No devices were enumerated from the opened project.",
+                "Device composition may be empty or further API adaptation is required."));
+        }
+    }
+
+    private static void TryCloseProject(object? project)
+    {
+        if (project is null)
+        {
+            return;
+        }
+
+        var closeMethod = project.GetType().GetMethod(
+            "Close",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: Type.EmptyTypes,
+            modifiers: null);
+        closeMethod?.Invoke(project, Array.Empty<object>());
+    }
+
+    private static void TryDispose(object? instance)
+    {
+        if (instance is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
     }
 
     private static string? ResolveEngineeringAssemblyPath(string installPath)
