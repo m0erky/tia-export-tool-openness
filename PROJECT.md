@@ -143,6 +143,10 @@ Scope:
 - Added `TypedExtractorBacklogStage` to generate `Export/Reports/TYPED_EXTRACTOR_BACKLOG.json` and `Export/Reports/TYPED_EXTRACTOR_BACKLOG.md`, prioritizing runtime-type mapping work by fallback frequency, unresolved relationships, and extraction confidence.
 - Registered typed-extractor backlog generation in the export pipeline after runtime type catalog generation.
 - Added unit tests for typed-extractor backlog artifact generation and prioritized impact scoring output.
+- Added `MappingImplementationTrackerStage` to generate `Export/Reports/MAPPING_IMPLEMENTATION_TRACKER.json` and `Export/Reports/MAPPING_IMPLEMENTATION_TRACKER.md`, including snapshot metrics and trend deltas across runs.
+- Added persistent tracker history (`Export/Reports/MAPPING_IMPLEMENTATION_TRACKER_HISTORY.json`) to compare mapping completion progress between consecutive exports.
+- Registered mapping tracker generation in the export pipeline after typed-extractor backlog generation.
+- Added unit tests for mapping implementation tracker artifact generation and cross-run trend detection behavior.
 
 ## Known Issues
 
@@ -175,6 +179,7 @@ Scope:
 - Next-best-actions impact scoring is currently heuristic; thresholds/weights should be tuned against real project outcomes and validated with domain experts.
 - Runtime type catalog currently infers a single TIA version context from runtime metadata and should be extended for multi-version side-by-side analysis when multiple runtimes are observed.
 - Typed-extractor backlog impact scoring is heuristic and should be tuned against real export outcomes and maintainer feedback to improve prioritization precision.
+- Mapping trend tracking currently uses output-folder local history files and should be consolidated with a stronger run-identity model for team/CI aggregation scenarios.
 
 ## Future Improvements
 
