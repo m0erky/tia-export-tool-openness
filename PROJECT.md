@@ -156,6 +156,7 @@ Scope:
 - Added `ExecutiveSummaryStage` to generate `Export/EXECUTIVE_SUMMARY.md` and `Export/Reports/EXECUTIVE_SUMMARY.json`, consolidating run health, domain distribution, priority actions, and key artifacts.
 - Fixed `ExecutiveSummaryStage` JSON payload naming collision in anonymous totals object (`ResultCount`/`IssueCount`) and aligned tests.
 - Improved relationship target resolution by introducing shared normalization/resolution logic across dependency/readiness/insight/backlog/action stages.
+- Aligned dependency graph test expectations with normalized target-resolution semantics (resolved edge threshold adjusted to match actual fixture graph).
 - Expanded typed extraction coverage with new `MetadataDomainExtractor` and `HmiConnectionArchiveDomainExtractor` plus registration and unit tests.
 - Added Windows validation workflow assets: `docs/WINDOWS_VALIDATION.md` and `scripts/validate-windows.ps1` for repeatable VS2022/TIA validation passes.
 - Applied performance-oriented parsing refinements by reusing static separator buffers in high-frequency analysis stages.

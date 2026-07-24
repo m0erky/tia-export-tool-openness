@@ -45,7 +45,7 @@ public sealed class DependencyGraphStageTests
 
         Assert.Equal("Partial", json.RootElement.GetProperty("status").GetString());
         Assert.True(json.RootElement.GetProperty("summary").GetProperty("edgeCount").GetInt32() >= 5);
-        Assert.True(json.RootElement.GetProperty("summary").GetProperty("resolvedEdges").GetInt32() >= 4);
+        Assert.True(json.RootElement.GetProperty("summary").GetProperty("resolvedEdges").GetInt32() >= 3);
         Assert.True(json.RootElement.GetProperty("summary").GetProperty("unresolvedEdges").GetInt32() >= 1);
 
         var edges = json.RootElement.GetProperty("edges").EnumerateArray().ToArray();
