@@ -31,10 +31,30 @@ public sealed class HardwareDomainExtractor : ITiaDomainExtractor
             ["Domain"] = Domain
         };
 
+        metadata["HierarchyDepth"] = depth.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        var lastSeparator = qualifiedPath.LastIndexOf('/');
+        if (lastSeparator > 0)
+        {
+            metadata["ParentPath"] = qualifiedPath[..lastSeparator];
+        }
+
+        var moduleCategory = ResolveModuleCategory(runtimeNode.GetType().Name);
+        metadata["ModuleCategory"] = moduleCategory;
+
         var interfaces = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "Interfaces", "NetworkInterfaces", "Ports");
         if (interfaces.Length > 0)
         {
             metadata["Interfaces"] = string.Join(", ", interfaces);
+            metadata["InterfaceCount"] = interfaces.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var position = ReflectionNodeIntrospection.TryReadString(runtimeNode, "PositionNumber")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "Slot")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "OrderNumber");
+        if (!string.IsNullOrWhiteSpace(position))
+        {
+            metadata["Position"] = position;
         }
 
         return new TiaProjectObjectNode(objectType, name, qualifiedPath, depth, metadata);
@@ -70,5 +90,32 @@ public sealed class HardwareDomainExtractor : ITiaDomainExtractor
         }
 
         return null;
+    }
+
+    private static string ResolveModuleCategory(string runtimeTypeName)
+    {
+        if (runtimeTypeName.Contains("Cpu", StringComparison.OrdinalIgnoreCase)
+            || runtimeTypeName.Contains("CPU", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Controller";
+        }
+
+        if (runtimeTypeName.Contains("Interface", StringComparison.OrdinalIgnoreCase)
+            || runtimeTypeName.Contains("Port", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Interface";
+        }
+
+        if (runtimeTypeName.Contains("Rack", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Rack";
+        }
+
+        if (runtimeTypeName.Contains("Device", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Device";
+        }
+
+        return "Module";
     }
 }

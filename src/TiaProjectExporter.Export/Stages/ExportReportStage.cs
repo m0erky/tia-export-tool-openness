@@ -55,6 +55,7 @@ public sealed class ExportReportStage : IExportStage
         DateTimeOffset generatedAt)
     {
         var jsonOptions = JsonOptionsFactory.CreateDefault();
+        var fallbackSummary = BuildFallbackSummary(context.Inventory);
         var objectTypeCounts = report.Results
             .GroupBy(result => result.ObjectType)
             .OrderBy(group => group.Key, StringComparer.Ordinal)
@@ -87,7 +88,15 @@ public sealed class ExportReportStage : IExportStage
                 context.Options.GenerateMarkdownSummaries
             },
             ObjectTypes = objectTypeCounts,
-            Archive = BuildArchiveSection(context, report)
+            Archive = BuildArchiveSection(context, report),
+            FallbackExtraction = new
+            {
+                fallbackSummary.TotalObjects,
+                fallbackSummary.TotalTypedObjects,
+                fallbackSummary.TotalFallbackObjects,
+                fallbackSummary.TotalUniqueFallbackRuntimeTypes,
+                Hotspots = fallbackSummary.Hotspots
+            }
         };
 
         return JsonSerializer.Serialize(payload, jsonOptions);
@@ -95,6 +104,7 @@ public sealed class ExportReportStage : IExportStage
 
     private static string BuildProjectOverviewMarkdown(ExportExecutionContext context, ExportReport report, TimeSpan duration)
     {
+        var fallbackSummary = BuildFallbackSummary(context.Inventory);
         var builder = new StringBuilder();
         builder.AppendLine("# Project Overview");
         builder.AppendLine();
@@ -108,6 +118,7 @@ public sealed class ExportReportStage : IExportStage
         builder.AppendLine();
 
         AppendAnalysisHub(builder, context);
+        AppendFallbackHotspots(builder, fallbackSummary);
 
         var failedOrSkipped = report.Results
             .Where(result => result.Status is ExportObjectStatus.Failed or ExportObjectStatus.Skipped)
@@ -211,6 +222,7 @@ public sealed class ExportReportStage : IExportStage
         TimeSpan duration,
         DateTimeOffset generatedAt)
     {
+        var fallbackSummary = BuildFallbackSummary(context.Inventory);
         var builder = new StringBuilder();
         builder.AppendLine("# Export Report");
         builder.AppendLine();
@@ -254,8 +266,87 @@ public sealed class ExportReportStage : IExportStage
             }
         }
 
+        builder.AppendLine();
+        AppendFallbackHotspots(builder, fallbackSummary);
+
         return builder.ToString();
     }
+
+    private static FallbackSummary BuildFallbackSummary(TiaProjectInventory? inventory)
+    {
+        if (inventory is null || inventory.Objects.Count == 0)
+        {
+            return new FallbackSummary(0, 0, 0, 0, Array.Empty<FallbackHotspotItem>());
+        }
+
+        var objects = inventory.Objects;
+        var fallbackNodes = objects.Where(node => TryReadBoolMetadata(node.Metadata, "FallbackReflectionUsed")).ToArray();
+        var typedNodes = objects.Where(node => TryReadBoolMetadata(node.Metadata, "ExtractedByTypedExtractor")).ToArray();
+
+        var hotspots = fallbackNodes
+            .GroupBy(node => new
+            {
+                Domain = GetMetadata(node.Metadata, "Domain", "Unmapped"),
+                RuntimeType = GetMetadata(node.Metadata, "RuntimeType", node.ObjectType),
+                node.ObjectType
+            })
+            .Select(group => new FallbackHotspotItem(
+                Domain: group.Key.Domain,
+                RuntimeType: group.Key.RuntimeType,
+                ObjectType: group.Key.ObjectType,
+                ExamplePath: group.First().QualifiedPath,
+                Count: group.Count()))
+            .OrderByDescending(item => item.Count)
+            .ThenBy(item => item.Domain, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.RuntimeType, StringComparer.OrdinalIgnoreCase)
+            .Take(15)
+            .ToArray();
+
+        return new FallbackSummary(
+            TotalObjects: objects.Count,
+            TotalFallbackObjects: fallbackNodes.Length,
+            TotalTypedObjects: typedNodes.Length,
+            TotalUniqueFallbackRuntimeTypes: fallbackNodes
+                .Select(node => GetMetadata(node.Metadata, "RuntimeType", node.ObjectType))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count(),
+            Hotspots: hotspots);
+    }
+
+    private static void AppendFallbackHotspots(StringBuilder builder, FallbackSummary summary)
+    {
+        builder.AppendLine("## Reflection Fallback Hotspots");
+        builder.AppendLine();
+        builder.AppendLine($"- Total inventory objects: **{summary.TotalObjects}**");
+        builder.AppendLine($"- Typed extractor objects: **{summary.TotalTypedObjects}**");
+        builder.AppendLine($"- Reflection fallback objects: **{summary.TotalFallbackObjects}**");
+        builder.AppendLine($"- Unique fallback runtime types: **{summary.TotalUniqueFallbackRuntimeTypes}**");
+        builder.AppendLine();
+
+        if (summary.Hotspots.Count == 0)
+        {
+            builder.AppendLine("No reflection fallback hotspots were detected in the current inventory.");
+            return;
+        }
+
+        foreach (var hotspot in summary.Hotspots)
+        {
+            builder.AppendLine($"- {hotspot.Domain}/{hotspot.ObjectType}: **{hotspot.Count}** (`{hotspot.RuntimeType}`) Example: `{hotspot.ExamplePath}`");
+        }
+    }
+
+    private static bool TryReadBoolMetadata(IReadOnlyDictionary<string, string>? metadata, string key) =>
+        metadata is not null
+        && metadata.TryGetValue(key, out var raw)
+        && bool.TryParse(raw, out var value)
+        && value;
+
+    private static string GetMetadata(IReadOnlyDictionary<string, string>? metadata, string key, string fallback) =>
+        metadata is not null
+        && metadata.TryGetValue(key, out var value)
+        && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : fallback;
 
     private static string FormatMessage(string? message) =>
         string.IsNullOrWhiteSpace(message)
@@ -320,4 +411,18 @@ public sealed class ExportReportStage : IExportStage
             builder.AppendLine($"- Archive SHA-256: `{context.ArchiveInfo.Sha256}`");
         }
     }
+
+    private sealed record FallbackSummary(
+        int TotalObjects,
+        int TotalFallbackObjects,
+        int TotalTypedObjects,
+        int TotalUniqueFallbackRuntimeTypes,
+        IReadOnlyList<FallbackHotspotItem> Hotspots);
+
+    private sealed record FallbackHotspotItem(
+        string Domain,
+        string RuntimeType,
+        string ObjectType,
+        string ExamplePath,
+        int Count);
 }

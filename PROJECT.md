@@ -46,6 +46,8 @@ Scope:
 ## TODO List
 
 - Implement deep Siemens.Engineering traversal (devices, network, PLC software, blocks, tags, UDTs, HMI, diagnostics) behind the reflection-safe Openness adapter.
+- Add Siemens-API-backed relationship extraction for block calls, tag usage, and dependencies to replace remaining metadata heuristics.
+- Expand typed extractor mappings for remaining high-volume runtime nodes currently emitted as `UnmappedRuntimeNode` fallback.
 - Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
 - Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
 
@@ -109,6 +111,10 @@ Scope:
 - Added explicit `ProjectHierarchyDomainExtractor` for project tree/group/folder structure extraction (including device-group mapping).
 - Enhanced extraction metadata with explicit capability flags (`ExtractedByTypedExtractor`, `FallbackReflectionUsed`) and added reflection fallback node capture for unmapped runtime nodes.
 - Extended coverage matrix artifacts to include API support and extraction-mode dimensions (`SupportedByApi`, typed counts, fallback counts).
+- Enriched hardware extraction metadata with hierarchy depth, parent path, interface count, module category, and slot/position details.
+- Enriched network extraction metadata with topology depth, endpoint count, subnet, network type, and protocol details.
+- Added reflection fallback hotspot analytics to `PROJECT_OVERVIEW.md`, `EXPORT_REPORT.md`, and `PROJECT_STATISTICS.json`.
+- Extended tests for hardware/network metadata enrichment and fallback hotspot reporting.
 
 ## Known Issues
 
@@ -117,7 +123,6 @@ Scope:
 - WPF cancellation behavior is implemented but still requires Windows runtime validation against real long-running export stages.
 - Recent output folder history behavior still needs UX validation on Windows for long path editing and combobox interaction.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
-- Full Siemens.Engineering object traversal is still pending; the current adapter validates runtime availability and reports structured readiness issues.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.
@@ -133,6 +138,7 @@ Scope:
 - Library/diagnostics/users-audit extraction is currently heuristic by runtime type names and should be validated against real Siemens Openness type hierarchies per TIA version.
 - Technology/HMI-deep extractors are currently heuristic by runtime type names and should be validated/tuned against real WinCC and technology object models in V18/V19/V20.
 - Fallback extraction currently classifies unmapped runtime nodes as generic `UnmappedRuntimeNode`; domain-specific typed mappings should continue replacing fallback paths over time.
+- Fallback hotspot analytics are currently reflection-metadata based and still require cross-validation against real Siemens API type catalogs on V18/V19/V20.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements

@@ -31,11 +31,26 @@ public sealed class NetworkDomainExtractor : ITiaDomainExtractor
             ["Domain"] = Domain
         };
 
+        metadata["TopologyDepth"] = depth.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        metadata["NetworkType"] = objectType;
+
         var references = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "Connections", "ConnectedTo", "Nodes", "Subnets", "IoSystems");
         if (references.Length > 0)
         {
             metadata["Dependencies"] = string.Join(", ", references);
+            metadata["EndpointCount"] = references.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+
+        var subnet = ReflectionNodeIntrospection.TryReadString(runtimeNode, "Subnet")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "SubnetName")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "Address");
+        if (!string.IsNullOrWhiteSpace(subnet))
+        {
+            metadata["Subnet"] = subnet;
+        }
+
+        var protocol = ResolveProtocol(runtimeNode.GetType().Name, objectType);
+        metadata["Protocol"] = protocol;
 
         return new TiaProjectObjectNode(objectType, name, qualifiedPath, depth, metadata);
     }
@@ -67,5 +82,25 @@ public sealed class NetworkDomainExtractor : ITiaDomainExtractor
         }
 
         return null;
+    }
+
+    private static string ResolveProtocol(string runtimeTypeName, string objectType)
+    {
+        if (runtimeTypeName.Contains("Profinet", StringComparison.OrdinalIgnoreCase) || objectType == "PROFINET")
+        {
+            return "PROFINET";
+        }
+
+        if (runtimeTypeName.Contains("Profibus", StringComparison.OrdinalIgnoreCase) || objectType == "PROFIBUS")
+        {
+            return "PROFIBUS";
+        }
+
+        if (runtimeTypeName.Contains("Ethernet", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Ethernet";
+        }
+
+        return "Generic";
     }
 }
