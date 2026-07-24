@@ -16,7 +16,8 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTiaServices(this IServiceCollection services)
     {
         services.AddSingleton<ITiaInstallationDiscoveryService, RegistryTiaInstallationDiscoveryService>();
-        services.AddSingleton<ITiaProjectInventoryProvider, UnavailableTiaProjectInventoryProvider>();
+        services.AddSingleton<ITiaProjectOpennessAdapter, UnavailableTiaProjectOpennessAdapter>();
+        services.AddSingleton<ITiaProjectInventoryProvider, OpennessBackedTiaProjectInventoryProvider>();
         return services;
     }
 }

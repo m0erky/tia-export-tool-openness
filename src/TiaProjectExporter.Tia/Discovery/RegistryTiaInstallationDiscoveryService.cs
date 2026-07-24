@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
+using System.Runtime.Versioning;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Core.Models;
 
@@ -56,6 +57,7 @@ public sealed class RegistryTiaInstallationDiscoveryService : ITiaInstallationDi
         return Task.FromResult<IReadOnlyList<DiscoveredTiaPortalInstallation>>(results);
     }
 
+    [SupportedOSPlatform("windows")]
     private DiscoveredTiaPortalInstallation? TryReadInstallation(
         TiaPortalVersion version,
         string subKeyPath,
@@ -84,6 +86,7 @@ public sealed class RegistryTiaInstallationDiscoveryService : ITiaInstallationDi
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static string? ReadFirstString(RegistryKey registryKey, params string[] candidateNames)
     {
         foreach (var candidateName in candidateNames)
@@ -97,4 +100,3 @@ public sealed class RegistryTiaInstallationDiscoveryService : ITiaInstallationDi
         return null;
     }
 }
-

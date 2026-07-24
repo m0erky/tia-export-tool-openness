@@ -45,7 +45,6 @@ Scope:
 
 ## TODO List
 
-- Define `ITiaProjectOpennessAdapter` and traversal abstractions for project/object enumeration.
 - Implement a concrete Siemens Openness-backed inventory provider for project metadata, device tree, and software discovery.
 - Add cancellation support through the UI workflow.
 - Add configuration persistence for recent output folders and export format selections.
@@ -71,6 +70,10 @@ Scope:
 - Verified `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj` passes on Ubuntu 24.04 with .NET SDK 8.0.129.
 - Replaced placeholder report artifacts with execution-driven generation for `PROJECT_OVERVIEW.md`, `PROJECT_STATISTICS.json`, and `EXPORT_REPORT.md`.
 - Added an `ExportReportStage` plus tests that verify report outputs are generated from real results/issues.
+- Added `ITiaProjectOpennessAdapter` and `TiaProjectTraversalResult` abstractions to isolate Siemens traversal concerns from inventory orchestration.
+- Replaced the placeholder inventory provider with `OpennessBackedTiaProjectInventoryProvider`, including robust exception-to-issue handling.
+- Added a placeholder `UnavailableTiaProjectOpennessAdapter` to keep non-Windows and non-Siemens environments functional while preserving architecture boundaries.
+- Added xUnit coverage for inventory provider status mapping (missing path, partial traversal, traversal failure).
 
 ## Known Issues
 
@@ -78,6 +81,7 @@ Scope:
 - WPF build/runtime verification still needs confirmation on a Windows machine with the Windows Desktop workload installed.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
 - TIA project inventory export currently emits placeholder availability/status artifacts until the Siemens Openness adapter is implemented.
+- Siemens.Engineering integration is still pending; current Openness adapter intentionally returns structured placeholder issues.
 - `FILE_INDEX.json`, `SEARCH_INDEX.json`, and `BLOCK_CALL_GRAPH.md` are still placeholder-first and need deep object-level export data.
 
 ## Future Improvements

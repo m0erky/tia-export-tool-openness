@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\src\TiaProjectExporter.Core\TiaProjectExporter.Core.csproj" />
     <ProjectReference Include="..\..\src\TiaProjectExporter.Application\TiaProjectExporter.Application.csproj" />
     <ProjectReference Include="..\..\src\TiaProjectExporter.Export\TiaProjectExporter.Export.csproj" />
+    <ProjectReference Include="..\..\src\TiaProjectExporter.Tia\TiaProjectExporter.Tia.csproj" />
   </ItemGroup>
 
   <ItemGroup>
