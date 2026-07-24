@@ -140,6 +140,9 @@ Scope:
 - Added `RuntimeTypeCatalogStage` to generate `Export/Reports/RUNTIME_TYPE_CATALOG.json` and `Export/Reports/RUNTIME_TYPE_CATALOG.md` with runtime type frequencies, TIA version context, typed/fallback mapping status, and extractor suggestion text.
 - Registered runtime type catalog generation in the export pipeline to support version-aware mapping expansion work.
 - Added unit tests for runtime type catalog artifact generation and version-aware catalog payload validation.
+- Added `TypedExtractorBacklogStage` to generate `Export/Reports/TYPED_EXTRACTOR_BACKLOG.json` and `Export/Reports/TYPED_EXTRACTOR_BACKLOG.md`, prioritizing runtime-type mapping work by fallback frequency, unresolved relationships, and extraction confidence.
+- Registered typed-extractor backlog generation in the export pipeline after runtime type catalog generation.
+- Added unit tests for typed-extractor backlog artifact generation and prioritized impact scoring output.
 
 ## Known Issues
 
@@ -171,6 +174,7 @@ Scope:
 - Readiness scoring weights are currently heuristic and should be calibrated using real large TIA projects (V18/V19/V20) to align with production export quality expectations.
 - Next-best-actions impact scoring is currently heuristic; thresholds/weights should be tuned against real project outcomes and validated with domain experts.
 - Runtime type catalog currently infers a single TIA version context from runtime metadata and should be extended for multi-version side-by-side analysis when multiple runtimes are observed.
+- Typed-extractor backlog impact scoring is heuristic and should be tuned against real export outcomes and maintainer feedback to improve prioritization precision.
 
 ## Future Improvements
 
