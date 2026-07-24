@@ -149,6 +149,10 @@ Scope:
 - Added unit tests for mapping implementation tracker artifact generation and cross-run trend detection behavior.
 - Added a root `README.md` with detailed purpose, architecture, prerequisites, Windows/VS2022 usage flow, output artifacts, configuration, reliability model, and limitations.
 - Added explicit documentation maintenance policy to keep `README.md` synchronized with user-visible functionality changes.
+- Added `DomainExtractorCoverageStage` to generate `Export/Reports/DOMAIN_EXTRACTOR_COVERAGE.json` and `Export/Reports/DOMAIN_EXTRACTOR_COVERAGE.md` with domain-to-extractor mapping matrix and explicit runtime-type gap list.
+- Registered domain extractor coverage generation in the export pipeline after mapping tracker generation.
+- Added unit tests for domain extractor coverage artifact generation and gap detection output.
+- Updated `README.md` to document the new domain extractor coverage artifacts and capability.
 
 ## Known Issues
 
@@ -182,6 +186,7 @@ Scope:
 - Runtime type catalog currently infers a single TIA version context from runtime metadata and should be extended for multi-version side-by-side analysis when multiple runtimes are observed.
 - Typed-extractor backlog impact scoring is heuristic and should be tuned against real export outcomes and maintainer feedback to improve prioritization precision.
 - Mapping trend tracking currently uses output-folder local history files and should be consolidated with a stronger run-identity model for team/CI aggregation scenarios.
+- Extractor coverage status currently relies on runtime metadata heuristics and should be cross-checked against explicit extractor-registration introspection for stricter completeness reporting.
 
 ## Future Improvements
 

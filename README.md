@@ -33,6 +33,7 @@ TIA projects are rich but difficult to diff, inspect, and analyze outside TIA Po
   - runtime type catalog
   - typed-extractor implementation backlog
   - mapping implementation tracker with cross-run trend
+  - domain extractor coverage matrix and gap list
 
 ## Architecture
 
@@ -149,6 +150,8 @@ Representative generated files:
 - `Reports/MAPPING_IMPLEMENTATION_TRACKER.json`
 - `Reports/MAPPING_IMPLEMENTATION_TRACKER.md`
 - `Reports/MAPPING_IMPLEMENTATION_TRACKER_HISTORY.json`
+- `Reports/DOMAIN_EXTRACTOR_COVERAGE.json`
+- `Reports/DOMAIN_EXTRACTOR_COVERAGE.md`
 
 ## Configuration
 
@@ -182,4 +185,3 @@ This repository is developed milestone-by-milestone.
 
 - `PROJECT.md` tracks architecture, current milestone, TODOs, completed tasks, known issues, future improvements, and build instructions.
 - This `README.md` must be updated whenever implemented functionality changes user-visible behavior, setup, output artifacts, or usage steps.
-
