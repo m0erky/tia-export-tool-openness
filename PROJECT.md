@@ -129,6 +129,9 @@ Scope:
 - Added `RelationshipInsightsStage` to generate `Export/Reports/RELATIONSHIP_INSIGHTS.json` and `Export/Reports/RELATIONSHIP_INSIGHTS.md` with AI-oriented relationship summaries, unresolved hotspots, and guidance.
 - Registered relationship insights generation in the export pipeline after dependency graph generation.
 - Added unit tests for relationship insights artifact generation and relationship/unresolved-edge summaries.
+- Added `ExportReadinessStage` to generate `Export/Reports/EXPORT_READINESS_SCORE.json` and `Export/Reports/EXPORT_READINESS_SCORE.md` with domain-level readiness scoring (0-100), unresolved relationship penalties, fallback penalties, and prioritized actions.
+- Registered readiness scoring generation in the export pipeline after relationship insights generation.
+- Added unit tests for readiness score artifact generation, domain scoring output, and priority action emission.
 
 ## Known Issues
 
@@ -157,6 +160,7 @@ Scope:
 - PLC extractor relationship metadata currently uses reflection heuristics/property-name conventions and still needs validation against concrete Siemens Openness block source/reference APIs.
 - Dependency and call graph resolution currently matches targets by names/paths heuristically and still needs direct Siemens identifier linking for full accuracy at scale.
 - Relationship insight guidance is currently heuristic and should be augmented with Siemens-native reference IDs and block compilation context when available.
+- Readiness scoring weights are currently heuristic and should be calibrated using real large TIA projects (V18/V19/V20) to align with production export quality expectations.
 
 ## Future Improvements
 

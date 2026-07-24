@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IExportStage, BlockCallGraphStage>();
         services.AddSingleton<IExportStage, DependencyGraphStage>();
         services.AddSingleton<IExportStage, RelationshipInsightsStage>();
+        services.AddSingleton<IExportStage, ExportReadinessStage>();
         services.AddSingleton<IExportStage, ObjectUsageAnalysisStage>();
         services.AddSingleton<IExportStage, MultilingualTextStage>();
         services.AddSingleton<IExportStage, ExportCoverageMatrixStage>();
