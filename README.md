@@ -188,6 +188,14 @@ Current keys:
 - Final validation requires real V18/V19/V20 projects on Windows.
 - Linux can run most tests, but Siemens Openness runtime itself is Windows-only.
 
+## Troubleshooting
+
+- **TIA installation not detected on Windows**
+  - Start the UI as a user that can read machine registry keys.
+  - Verify TIA Portal and Openness are installed for that machine/user.
+  - Re-run **Detect Versions** after installing or repairing TIA components.
+  - The discovery logic now probes multiple Siemens registry layouts and uninstall entries for V18/V19/V20, but custom corporate installations may still require registry policy exceptions.
+
 ## Development workflow note
 
 This repository is developed milestone-by-milestone.

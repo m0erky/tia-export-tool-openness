@@ -161,6 +161,8 @@ Scope:
 - Added Windows validation workflow assets: `docs/WINDOWS_VALIDATION.md` and `scripts/validate-windows.ps1` for repeatable VS2022/TIA validation passes.
 - Applied performance-oriented parsing refinements by reusing static separator buffers in high-frequency analysis stages.
 - Updated `README.md` to document executive summary artifacts and Windows validation workflow assets.
+- Hardened Windows TIA installation discovery for V18/V19/V20 by probing multiple Siemens registry key layouts, user/machine hives, and uninstall entries, plus recursive Siemens tree fallback probing.
+- Added README troubleshooting guidance for Windows installations not being detected.
 
 ## Known Issues
 
