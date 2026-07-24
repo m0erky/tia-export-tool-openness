@@ -35,10 +35,44 @@ public sealed class PlcTagDomainExtractor : ITiaDomainExtractor
             ["Domain"] = Domain
         };
 
+        var dataType = ReflectionNodeIntrospection.TryReadString(runtimeNode, "DataType")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "TypeName")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "Datatype");
+        if (!string.IsNullOrWhiteSpace(dataType))
+        {
+            metadata["DataType"] = dataType;
+        }
+
+        var address = ReflectionNodeIntrospection.TryReadString(runtimeNode, "Address")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "LogicalAddress");
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            metadata["Address"] = address;
+        }
+
+        var initialValue = ReflectionNodeIntrospection.TryReadString(runtimeNode, "InitialValue")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "StartValue")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "DefaultValue");
+        if (!string.IsNullOrWhiteSpace(initialValue))
+        {
+            metadata["InitialValue"] = initialValue;
+        }
+
         var referencedTags = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "ReferencedTags", "UsedTags", "TagUsage");
         if (referencedTags.Length > 0)
         {
             metadata["ReferencedTags"] = string.Join(", ", referencedTags);
+            metadata["TagUsage"] = string.Join(", ", referencedTags);
+        }
+
+        if (objectType.Equals("TagTable", StringComparison.OrdinalIgnoreCase))
+        {
+            var tags = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "Tags", "TagList", "Entries");
+            if (tags.Length > 0)
+            {
+                metadata["TagCount"] = tags.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                metadata["Dependencies"] = string.Join(", ", tags);
+            }
         }
 
         return new TiaProjectObjectNode(objectType, name, qualifiedPath, depth, metadata);

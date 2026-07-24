@@ -31,16 +31,57 @@ public sealed class PlcBlockDomainExtractor : ITiaDomainExtractor
             ["Domain"] = Domain
         };
 
-        var calls = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "Calls", "CalledBlocks", "ReferencedBlocks", "UsedBlocks");
+        metadata["BlockType"] = objectType;
+
+        if (objectType.Equals("OB", StringComparison.OrdinalIgnoreCase))
+        {
+            metadata["IsEntryPoint"] = "true";
+        }
+
+        var language = ReflectionNodeIntrospection.TryReadString(runtimeNode, "ProgrammingLanguage")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "Language");
+        if (!string.IsNullOrWhiteSpace(language))
+        {
+            metadata["Language"] = language;
+        }
+
+        var blockNumber = ReflectionNodeIntrospection.TryReadString(runtimeNode, "Number")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "BlockNumber")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "Id");
+        if (!string.IsNullOrWhiteSpace(blockNumber))
+        {
+            metadata["BlockNumber"] = blockNumber;
+        }
+
+        var calls = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "Calls", "CalledBlocks", "ReferencedBlocks", "UsedBlocks", "BlockCalls", "InvokedBlocks");
         if (calls.Length > 0)
         {
             metadata["Calls"] = string.Join(", ", calls);
         }
 
-        var dependencies = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "References", "Dependencies", "UsedTypes", "ReferencedTags");
-        if (dependencies.Length > 0)
+        var tagUsage = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "TagUsage", "UsedTags", "ReferencedTags");
+        if (tagUsage.Length > 0)
         {
-            metadata["Dependencies"] = string.Join(", ", dependencies);
+            metadata["TagUsage"] = string.Join(", ", tagUsage);
+        }
+
+        var dataType = ReflectionNodeIntrospection.TryReadString(runtimeNode, "DataType")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "TypeName")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "InstanceOf");
+        if (!string.IsNullOrWhiteSpace(dataType))
+        {
+            metadata["DataType"] = dataType;
+        }
+
+        var dependencies = ReflectionNodeIntrospection.ExtractNamedReferences(runtimeNode, "References", "Dependencies", "UsedTypes", "ReferencedTags");
+        var mergedDependencies = dependencies
+            .Concat(tagUsage)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (mergedDependencies.Length > 0)
+        {
+            metadata["Dependencies"] = string.Join(", ", mergedDependencies);
         }
 
         return new TiaProjectObjectNode(objectType, name, qualifiedPath, depth, metadata);
@@ -61,6 +102,13 @@ public sealed class PlcBlockDomainExtractor : ITiaDomainExtractor
         if (runtimeTypeName.Contains("FC", StringComparison.OrdinalIgnoreCase))
         {
             return "FC";
+        }
+
+        if (runtimeTypeName.Contains("InstanceDB", StringComparison.OrdinalIgnoreCase)
+            || runtimeTypeName.Contains("InstanceDb", StringComparison.OrdinalIgnoreCase)
+            || runtimeTypeName.Contains("IDB", StringComparison.OrdinalIgnoreCase))
+        {
+            return "InstanceDB";
         }
 
         if (runtimeTypeName.Contains("DB", StringComparison.OrdinalIgnoreCase))

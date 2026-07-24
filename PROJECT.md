@@ -48,6 +48,7 @@ Scope:
 - Implement deep Siemens.Engineering traversal (devices, network, PLC software, blocks, tags, UDTs, HMI, diagnostics) behind the reflection-safe Openness adapter.
 - Add Siemens-API-backed relationship extraction for block calls, tag usage, and dependencies to replace remaining metadata heuristics.
 - Expand typed extractor mappings for remaining high-volume runtime nodes currently emitted as `UnmappedRuntimeNode` fallback.
+- Validate/extend PLC extractor mappings for instance DBs, block language metadata, and tag-table semantics against real TIA V18/V19/V20 runtime objects.
 - Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
 - Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
 
@@ -118,6 +119,10 @@ Scope:
 - Added a domain-aware fallback runtime classifier so unmapped reflection nodes are categorized into `Project`, `Hardware`, `Network`, `PLC`, `HMI`, `Technology`, `Libraries`, `Diagnostics`, and `UsersAudit` buckets with dedicated object types.
 - Added unit tests for fallback runtime classification behavior across key Siemens runtime-type patterns.
 - Hardened fallback classifier project-domain matching to avoid false-positive classification caused by generic root `Project/...` path prefixes.
+- Enriched PLC block extraction metadata with `IsEntryPoint`, `Language`, `BlockNumber`, `TagUsage`, `DataType`, and broader call/dependency reference capture.
+- Added explicit `InstanceDB` classification in PLC block extraction for runtime type names containing instance DB markers.
+- Enriched PLC tag/tag-table extraction metadata with `DataType`, `Address`, `InitialValue`, `TagUsage`, `TagCount`, and table-level dependency capture.
+- Added unit tests for PLC block/tag extraction behavior, including OB relationship metadata, InstanceDB classification, and tag-table metadata extraction.
 
 ## Known Issues
 
@@ -143,6 +148,7 @@ Scope:
 - Fallback extraction now applies coarse domain-aware classification, but mappings are still heuristic and should be refined with real Siemens runtime catalogs per version.
 - Fallback hotspot analytics are currently reflection-metadata based and still require cross-validation against real Siemens API type catalogs on V18/V19/V20.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
+- PLC extractor relationship metadata currently uses reflection heuristics/property-name conventions and still needs validation against concrete Siemens Openness block source/reference APIs.
 
 ## Future Improvements
 
