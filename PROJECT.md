@@ -102,6 +102,8 @@ Scope:
 - Added `ExportCoverageMatrixStage` to produce `EXPORT_COVERAGE_MATRIX.json` and `EXPORT_COVERAGE_MATRIX.md`, including domain-by-domain discovered counts, high-confidence counts, issue counts, and normalized coverage status (`CompleteCandidate`, `PartialCandidate`, `LowConfidence`, `NotDiscovered`).
 - Added explicit `HardwareDomainExtractor` and `NetworkDomainExtractor` implementations and wired them into typed Openness extraction, expanding structured domain coverage beyond PLC/HMI.
 - Added focused extractor unit tests covering hardware-module and PROFINET connection extraction behavior.
+- Added explicit `LibraryDomainExtractor`, `DiagnosticsDomainExtractor`, and `UsersAuditDomainExtractor` implementations and wired them into typed Openness extraction.
+- Added focused extractor unit tests for library type versions, diagnostics severity extraction, and user-role mapping.
 
 ## Known Issues
 
@@ -123,6 +125,7 @@ Scope:
 - Typed domain extractor coverage is still partial and must be expanded domain-by-domain (Network, Hardware modules, Technology objects, Libraries, Diagnostics, Users/Audit, full HMI internals) to reach maximum-possible export completeness.
 - Coverage matrix statuses are currently candidate-level heuristics and should be mapped to explicit Siemens API capability checks for final production completeness auditing.
 - Network/hardware extractor classification is currently heuristic by runtime type names and should be hardened against real V18/V19/V20 runtime type catalogs.
+- Library/diagnostics/users-audit extraction is currently heuristic by runtime type names and should be validated against real Siemens Openness type hierarchies per TIA version.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements
