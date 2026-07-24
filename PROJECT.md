@@ -135,6 +135,7 @@ Scope:
 - Added `NextBestActionsStage` to generate `Export/Reports/NEXT_BEST_ACTIONS.json` and `Export/Reports/NEXT_BEST_ACTIONS.md`, combining readiness signals, fallback pressure, unresolved relationships, and issue hotspots into one prioritized action backlog.
 - Registered next-best-actions generation in the export pipeline after readiness scoring.
 - Added unit tests for next-best-actions artifact generation and prioritized action categories.
+- Fixed a compile-time regression in `NextBestActionsStage` by correcting `IReadOnlyList` cardinality usage (`Count` instead of `Length`) for unresolved-target handling.
 
 ## Known Issues
 

@@ -200,7 +200,7 @@ public sealed class NextBestActionsStage : IExportStage
                 Evidence: $"Low-confidence objects: {input.LowConfidence}.");
         }
 
-        if (input.UnresolvedTargets.Length > 0)
+        if (input.UnresolvedTargets.Count > 0)
         {
             var top = input.UnresolvedTargets[0];
             var impact = Math.Min(95, 55 + (top.Count * 5));
