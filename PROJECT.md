@@ -132,6 +132,9 @@ Scope:
 - Added `ExportReadinessStage` to generate `Export/Reports/EXPORT_READINESS_SCORE.json` and `Export/Reports/EXPORT_READINESS_SCORE.md` with domain-level readiness scoring (0-100), unresolved relationship penalties, fallback penalties, and prioritized actions.
 - Registered readiness scoring generation in the export pipeline after relationship insights generation.
 - Added unit tests for readiness score artifact generation, domain scoring output, and priority action emission.
+- Added `NextBestActionsStage` to generate `Export/Reports/NEXT_BEST_ACTIONS.json` and `Export/Reports/NEXT_BEST_ACTIONS.md`, combining readiness signals, fallback pressure, unresolved relationships, and issue hotspots into one prioritized action backlog.
+- Registered next-best-actions generation in the export pipeline after readiness scoring.
+- Added unit tests for next-best-actions artifact generation and prioritized action categories.
 
 ## Known Issues
 
@@ -161,6 +164,7 @@ Scope:
 - Dependency and call graph resolution currently matches targets by names/paths heuristically and still needs direct Siemens identifier linking for full accuracy at scale.
 - Relationship insight guidance is currently heuristic and should be augmented with Siemens-native reference IDs and block compilation context when available.
 - Readiness scoring weights are currently heuristic and should be calibrated using real large TIA projects (V18/V19/V20) to align with production export quality expectations.
+- Next-best-actions impact scoring is currently heuristic; thresholds/weights should be tuned against real project outcomes and validated with domain experts.
 
 ## Future Improvements
 
