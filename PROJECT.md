@@ -115,6 +115,8 @@ Scope:
 - Enriched network extraction metadata with topology depth, endpoint count, subnet, network type, and protocol details.
 - Added reflection fallback hotspot analytics to `PROJECT_OVERVIEW.md`, `EXPORT_REPORT.md`, and `PROJECT_STATISTICS.json`.
 - Extended tests for hardware/network metadata enrichment and fallback hotspot reporting.
+- Added a domain-aware fallback runtime classifier so unmapped reflection nodes are categorized into `Project`, `Hardware`, `Network`, `PLC`, `HMI`, `Technology`, `Libraries`, `Diagnostics`, and `UsersAudit` buckets with dedicated object types.
+- Added unit tests for fallback runtime classification behavior across key Siemens runtime-type patterns.
 
 ## Known Issues
 
@@ -137,7 +139,7 @@ Scope:
 - Network/hardware extractor classification is currently heuristic by runtime type names and should be hardened against real V18/V19/V20 runtime type catalogs.
 - Library/diagnostics/users-audit extraction is currently heuristic by runtime type names and should be validated against real Siemens Openness type hierarchies per TIA version.
 - Technology/HMI-deep extractors are currently heuristic by runtime type names and should be validated/tuned against real WinCC and technology object models in V18/V19/V20.
-- Fallback extraction currently classifies unmapped runtime nodes as generic `UnmappedRuntimeNode`; domain-specific typed mappings should continue replacing fallback paths over time.
+- Fallback extraction now applies coarse domain-aware classification, but mappings are still heuristic and should be refined with real Siemens runtime catalogs per version.
 - Fallback hotspot analytics are currently reflection-metadata based and still require cross-validation against real Siemens API type catalogs on V18/V19/V20.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 

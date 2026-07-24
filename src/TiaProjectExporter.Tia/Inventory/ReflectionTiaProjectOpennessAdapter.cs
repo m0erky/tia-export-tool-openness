@@ -433,7 +433,8 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
         string qualifiedPath,
         int depth)
     {
-        if (!ShouldFallbackExtract(runtimeTypeName))
+        var classification = FallbackRuntimeClassifier.Classify(runtimeTypeName, qualifiedPath);
+        if (classification is null)
         {
             return null;
         }
@@ -442,32 +443,21 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
             ?? TryReadString(runtimeNode, "DisplayName")
             ?? runtimeTypeName;
 
-        var metadata = new Dictionary<string, string>(ReflectionNodeIntrospection.BuildCommonMetadata(runtimeNode, "Unknown"), StringComparer.OrdinalIgnoreCase)
+        var metadata = new Dictionary<string, string>(ReflectionNodeIntrospection.BuildCommonMetadata(runtimeNode, classification.ObjectType), StringComparer.OrdinalIgnoreCase)
         {
-            ["Domain"] = "Unmapped",
+            ["Domain"] = classification.Domain,
             ["ExtractionStrategy"] = "ReflectionFallback",
             ["ExtractedByTypedExtractor"] = "false",
             ["FallbackReflectionUsed"] = "true"
         };
 
         return new TiaProjectObjectNode(
-            ObjectType: "UnmappedRuntimeNode",
+            ObjectType: classification.ObjectType,
             Name: name,
             QualifiedPath: qualifiedPath,
             Depth: depth,
             Metadata: metadata);
     }
-
-    private static bool ShouldFallbackExtract(string runtimeTypeName) =>
-        runtimeTypeName.Contains("Group", StringComparison.OrdinalIgnoreCase)
-        || runtimeTypeName.Contains("Folder", StringComparison.OrdinalIgnoreCase)
-        || runtimeTypeName.Contains("Node", StringComparison.OrdinalIgnoreCase)
-        || runtimeTypeName.Contains("Container", StringComparison.OrdinalIgnoreCase)
-        || runtimeTypeName.Contains("Technology", StringComparison.OrdinalIgnoreCase)
-        || runtimeTypeName.Contains("Hmi", StringComparison.OrdinalIgnoreCase)
-        || runtimeTypeName.Contains("Library", StringComparison.OrdinalIgnoreCase)
-        || runtimeTypeName.Contains("Network", StringComparison.OrdinalIgnoreCase)
-        || runtimeTypeName.Contains("Device", StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<object> EnumerateChildObjects(object parent)
     {
