@@ -106,6 +106,8 @@ public sealed class ExportReportStage : IExportStage
         builder.AppendLine($"- Recoverable issues: **{report.Issues.Count}**");
         builder.AppendLine();
 
+        AppendAnalysisHub(builder, context);
+
         var failedOrSkipped = report.Results
             .Where(result => result.Status is ExportObjectStatus.Failed or ExportObjectStatus.Skipped)
             .Take(15)
@@ -143,6 +145,63 @@ public sealed class ExportReportStage : IExportStage
         }
 
         return builder.ToString();
+    }
+
+    private static void AppendAnalysisHub(StringBuilder builder, ExportExecutionContext context)
+    {
+        var analysisArtifacts = context.Artifacts
+            .Where(artifact =>
+                artifact.RelativePath.Equals("Export/BLOCK_CALL_GRAPH.md", StringComparison.OrdinalIgnoreCase)
+                || artifact.RelativePath.Equals("Export/DEPENDENCIES.json", StringComparison.OrdinalIgnoreCase)
+                || artifact.RelativePath.StartsWith("Export/Reports/", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(artifact => artifact.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var inventory = context.Inventory;
+        var objectTypeSummary = inventory?.Objects
+            .GroupBy(node => node.ObjectType)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToArray();
+
+        builder.AppendLine("## Analysis Hub");
+        builder.AppendLine();
+        builder.AppendLine($"- Analysis artifacts generated: **{analysisArtifacts.Length}**");
+
+        if (inventory is not null)
+        {
+            builder.AppendLine($"- Inventory objects discovered: **{inventory.Objects.Count}**");
+            builder.AppendLine($"- Inventory issues: **{inventory.Issues.Count}**");
+        }
+
+        builder.AppendLine();
+
+        if (analysisArtifacts.Length > 0)
+        {
+            builder.AppendLine("### Key Files");
+            builder.AppendLine();
+
+            foreach (var artifact in analysisArtifacts)
+            {
+                builder.AppendLine($"- `{artifact.RelativePath}` ({artifact.Format}, {artifact.ContentLength} bytes)");
+            }
+
+            builder.AppendLine();
+        }
+
+        if (objectTypeSummary is { Length: > 0 })
+        {
+            builder.AppendLine("### Top Object Types");
+            builder.AppendLine();
+
+            foreach (var entry in objectTypeSummary)
+            {
+                builder.AppendLine($"- {entry.Key}: **{entry.Count()}**");
+            }
+
+            builder.AppendLine();
+        }
     }
 
     private static string BuildExportReportMarkdown(

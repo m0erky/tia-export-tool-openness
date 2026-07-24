@@ -30,6 +30,7 @@ public sealed class ExportReportStageTests
         var statistics = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/PROJECT_STATISTICS.json");
 
         Assert.Contains("Recoverable issues", overview.Content, StringComparison.Ordinal);
+        Assert.Contains("Analysis Hub", overview.Content, StringComparison.Ordinal);
         Assert.Contains("Inventory", report.Content, StringComparison.Ordinal);
         using var document = JsonDocument.Parse(statistics.Content);
         var totalsElement = document.RootElement.GetProperty("totals");

@@ -88,6 +88,7 @@ Scope:
 - Expanded automated validation to 14 passing xUnit tests.
 - Added `ObjectUsageAnalysisStage` that generates `TAG_USAGE` and `UNUSED_OBJECTS` artifacts in JSON + Markdown from inventory dependency metadata.
 - Expanded automated validation to 15 passing xUnit tests.
+- Enhanced `PROJECT_OVERVIEW.md` generation with an analysis aggregator hub that summarizes produced analysis artifacts, key inventory statistics, and dominant object types for faster LLM orientation.
 
 ## Known Issues
 
