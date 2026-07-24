@@ -264,7 +264,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         var installations = await _installationDiscoveryService.DiscoverAsync(CancellationToken.None);
 
-        await Application.Current.Dispatcher.InvokeAsync(() =>
+        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             foreach (var installation in installations.OrderBy(item => item.Version))
             {
@@ -344,7 +344,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private Task HandleProgressAsync(ExportProgressUpdate update)
     {
-        return Application.Current.Dispatcher.InvokeAsync(() =>
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             ProgressText = update.CurrentStage;
             CurrentObject = update.CurrentObject;
@@ -465,7 +465,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private void OnLogEntryAdded(object? sender, string entry)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             LogEntries.Add(entry);
 

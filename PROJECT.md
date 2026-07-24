@@ -136,6 +136,7 @@ Scope:
 - Registered next-best-actions generation in the export pipeline after readiness scoring.
 - Added unit tests for next-best-actions artifact generation and prioritized action categories.
 - Fixed a compile-time regression in `NextBestActionsStage` by correcting `IReadOnlyList` cardinality usage (`Count` instead of `Length`) for unresolved-target handling.
+- Fixed Windows/VS2022 UI build regressions by adding missing `System.IO` usage imports in `JsonExporterSettingsStore` and disambiguating WPF dispatcher calls via `System.Windows.Application.Current` in `MainWindowViewModel`.
 
 ## Known Issues
 
