@@ -126,6 +126,9 @@ Scope:
 - Upgraded `BLOCK_CALL_GRAPH.md` generation with entry-point detection, resolved vs unresolved call-edge classification, dashed Mermaid links for unresolved targets, and summary sections for hotspots.
 - Upgraded `DEPENDENCIES.json` generation with relationship-aware edges (`Calls`, `DependsOn`, `Uses`, `UsesTag`, `References`), metadata-key provenance, resolved/unresolved edge tracking, and unresolved-target summaries.
 - Extended graph-stage tests to verify unresolved target handling, relationship typing, and enriched graph/report sections.
+- Added `RelationshipInsightsStage` to generate `Export/Reports/RELATIONSHIP_INSIGHTS.json` and `Export/Reports/RELATIONSHIP_INSIGHTS.md` with AI-oriented relationship summaries, unresolved hotspots, and guidance.
+- Registered relationship insights generation in the export pipeline after dependency graph generation.
+- Added unit tests for relationship insights artifact generation and relationship/unresolved-edge summaries.
 
 ## Known Issues
 
@@ -153,6 +156,7 @@ Scope:
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 - PLC extractor relationship metadata currently uses reflection heuristics/property-name conventions and still needs validation against concrete Siemens Openness block source/reference APIs.
 - Dependency and call graph resolution currently matches targets by names/paths heuristically and still needs direct Siemens identifier linking for full accuracy at scale.
+- Relationship insight guidance is currently heuristic and should be augmented with Siemens-native reference IDs and block compilation context when available.
 
 ## Future Improvements
 
