@@ -126,6 +126,45 @@ public sealed class AdditionalDomainExtractorTests
         Assert.Equal("true", node.Metadata?["Hierarchy"]);
     }
 
+    [Fact]
+    public void MetadataDomainExtractor_ExtractsLanguageResource()
+    {
+        var extractor = new MetadataDomainExtractor();
+        var runtime = new LanguageMetadataRuntime
+        {
+            Name = "en-US",
+            Culture = "en-US",
+            Version = "2.1"
+        };
+
+        var node = extractor.TryExtract(runtime, "Project/Metadata/Languages/en-US", 2);
+
+        Assert.NotNull(node);
+        Assert.Equal("LanguageResource", node.ObjectType);
+        Assert.Equal("Metadata", node.Metadata?["Domain"]);
+        Assert.Equal("en-US", node.Metadata?["Language"]);
+    }
+
+    [Fact]
+    public void HmiConnectionArchiveDomainExtractor_ExtractsConnection()
+    {
+        var extractor = new HmiConnectionArchiveDomainExtractor();
+        var runtime = new HmiConnectionRuntime
+        {
+            Name = "PLC_Conn",
+            Connections = new[] { new NamedNode("PLC_1") },
+            Protocol = "S7"
+        };
+
+        var node = extractor.TryExtract(runtime, "Project/HMI/Connections/PLC_Conn", 2);
+
+        Assert.NotNull(node);
+        Assert.Equal("Connection", node.ObjectType);
+        Assert.Equal("HMI", node.Metadata?["Domain"]);
+        Assert.Contains("PLC_1", node.Metadata?["Dependencies"]);
+        Assert.Equal("S7", node.Metadata?["Protocol"]);
+    }
+
     private sealed class NamedNode
     {
         public NamedNode(string name)
@@ -179,5 +218,23 @@ public sealed class AdditionalDomainExtractorTests
     private sealed class DeviceGroupRuntime
     {
         public string? Name { get; init; }
+    }
+
+    private sealed class LanguageMetadataRuntime
+    {
+        public string? Name { get; init; }
+
+        public string? Culture { get; init; }
+
+        public string? Version { get; init; }
+    }
+
+    private sealed class HmiConnectionRuntime
+    {
+        public string? Name { get; init; }
+
+        public string? Protocol { get; init; }
+
+        public IEnumerable<NamedNode>? Connections { get; init; }
     }
 }

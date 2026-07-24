@@ -153,6 +153,12 @@ Scope:
 - Registered domain extractor coverage generation in the export pipeline after mapping tracker generation.
 - Added unit tests for domain extractor coverage artifact generation and gap detection output.
 - Updated `README.md` to document the new domain extractor coverage artifacts and capability.
+- Added `ExecutiveSummaryStage` to generate `Export/EXECUTIVE_SUMMARY.md` and `Export/Reports/EXECUTIVE_SUMMARY.json`, consolidating run health, domain distribution, priority actions, and key artifacts.
+- Improved relationship target resolution by introducing shared normalization/resolution logic across dependency/readiness/insight/backlog/action stages.
+- Expanded typed extraction coverage with new `MetadataDomainExtractor` and `HmiConnectionArchiveDomainExtractor` plus registration and unit tests.
+- Added Windows validation workflow assets: `docs/WINDOWS_VALIDATION.md` and `scripts/validate-windows.ps1` for repeatable VS2022/TIA validation passes.
+- Applied performance-oriented parsing refinements by reusing static separator buffers in high-frequency analysis stages.
+- Updated `README.md` to document executive summary artifacts and Windows validation workflow assets.
 
 ## Known Issues
 
@@ -187,6 +193,7 @@ Scope:
 - Typed-extractor backlog impact scoring is heuristic and should be tuned against real export outcomes and maintainer feedback to improve prioritization precision.
 - Mapping trend tracking currently uses output-folder local history files and should be consolidated with a stronger run-identity model for team/CI aggregation scenarios.
 - Extractor coverage status currently relies on runtime metadata heuristics and should be cross-checked against explicit extractor-registration introspection for stricter completeness reporting.
+- Relationship target resolution is stronger than before but still ultimately heuristic until Siemens-native stable IDs are extracted directly from Openness object references.
 
 ## Future Improvements
 

@@ -22,7 +22,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITiaDomainExtractor, HardwareDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, NetworkDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, LibraryDomainExtractor>();
+        services.AddSingleton<ITiaDomainExtractor, MetadataDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, HmiScreenFaceplateDomainExtractor>();
+        services.AddSingleton<ITiaDomainExtractor, HmiConnectionArchiveDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, HmiRecipeAlarmScriptDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, DiagnosticsDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, UsersAuditDomainExtractor>();

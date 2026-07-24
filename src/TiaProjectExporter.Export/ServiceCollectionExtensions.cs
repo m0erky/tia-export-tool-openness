@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IExportStage, ObjectUsageAnalysisStage>();
         services.AddSingleton<IExportStage, MultilingualTextStage>();
         services.AddSingleton<IExportStage, ExportCoverageMatrixStage>();
+        services.AddSingleton<IExportStage, ExecutiveSummaryStage>();
         services.AddSingleton<IExportStage, ExportReportStage>();
         services.AddSingleton<IExportStage, ExportIndexStage>();
         services.AddSingleton<IExportStage, CompressionStage>();

@@ -12,6 +12,7 @@ namespace TiaProjectExporter.Export.Stages;
 /// </summary>
 public sealed class ExportReadinessStage : IExportStage
 {
+    private static readonly char[] DependencySeparators = [',', ';', '|'];
     private static readonly IReadOnlyDictionary<string, bool> SupportedByApiMap = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
     {
         ["Project"] = true,
@@ -106,7 +107,7 @@ public sealed class ExportReadinessStage : IExportStage
             .SelectMany(source => ParseRelationships(source.Metadata).Select(relation => new RelationshipEdge(
                 SourceDomain: ResolveDomain(source),
                 Target: relation.Target,
-                Resolved: IsResolvedTarget(relation.Target, nodeIds, nodeNames),
+                Resolved: RelationshipTargetResolver.IsResolvedTarget(relation.Target, nodeIds, nodeNames),
                 Relationship: relation.Relationship)))
             .ToArray();
 
@@ -359,18 +360,10 @@ public sealed class ExportReadinessStage : IExportStage
 
     private static IEnumerable<string> SplitValues(string raw)
     {
-        char[] separators = [',', ';', '|'];
-        return raw.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    }
-
-    private static bool IsResolvedTarget(string target, IReadOnlySet<string> nodeIds, IReadOnlySet<string> nodeNames)
-    {
-        if (nodeIds.Contains(target) || nodeNames.Contains(target))
-        {
-            return true;
-        }
-
-        return nodeIds.Any(nodeId => nodeId.EndsWith($"/{target}", StringComparison.OrdinalIgnoreCase));
+        return raw
+            .Split(DependencySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(RelationshipTargetResolver.NormalizeTarget)
+            .Where(token => !string.IsNullOrWhiteSpace(token));
     }
 
     private static string BuildNodeId(TiaProjectObjectNode node)

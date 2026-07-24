@@ -13,6 +13,7 @@ namespace TiaProjectExporter.Export.Stages;
 public sealed class ObjectUsageAnalysisStage : IExportStage
 {
     private static readonly string[] DependencyKeys = ["Calls", "DependsOn", "Uses", "References", "Dependencies", "TagUsage", "ReferencedTags"];
+    private static readonly char[] DependencySeparators = [',', ';', '|'];
 
     /// <inheritdoc />
     public string Name => "Usage Analysis";
@@ -189,8 +190,7 @@ public sealed class ObjectUsageAnalysisStage : IExportStage
 
     private static IEnumerable<string> SplitValues(string raw)
     {
-        char[] separators = [',', ';', '|'];
-        return raw.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return raw.Split(DependencySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static Node? ResolveTarget(string token, IReadOnlyDictionary<string, Node> byId, IReadOnlyDictionary<string, Node> byName)

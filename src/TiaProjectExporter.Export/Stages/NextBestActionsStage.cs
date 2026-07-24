@@ -12,6 +12,7 @@ namespace TiaProjectExporter.Export.Stages;
 /// </summary>
 public sealed class NextBestActionsStage : IExportStage
 {
+    private static readonly char[] DependencySeparators = [',', ';', '|'];
     private static readonly string[] DomainOrder =
     [
         "Project",
@@ -91,7 +92,7 @@ public sealed class NextBestActionsStage : IExportStage
             {
                 Domain = ResolveDomain(source),
                 relation.Target,
-                Resolved = IsResolvedTarget(relation.Target, nodeIds, nodeNames)
+                Resolved = RelationshipTargetResolver.IsResolvedTarget(relation.Target, nodeIds, nodeNames)
             }))
             .Where(entry => !entry.Resolved)
             .GroupBy(entry => entry.Domain)
@@ -283,18 +284,10 @@ public sealed class NextBestActionsStage : IExportStage
 
     private static IEnumerable<string> SplitValues(string raw)
     {
-        char[] separators = [',', ';', '|'];
-        return raw.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    }
-
-    private static bool IsResolvedTarget(string target, IReadOnlySet<string> nodeIds, IReadOnlySet<string> nodeNames)
-    {
-        if (nodeIds.Contains(target) || nodeNames.Contains(target))
-        {
-            return true;
-        }
-
-        return nodeIds.Any(nodeId => nodeId.EndsWith($"/{target}", StringComparison.OrdinalIgnoreCase));
+        return raw
+            .Split(DependencySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(RelationshipTargetResolver.NormalizeTarget)
+            .Where(token => !string.IsNullOrWhiteSpace(token));
     }
 
     private static bool IsTrue(IReadOnlyDictionary<string, string>? metadata, string key) =>

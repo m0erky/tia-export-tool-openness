@@ -26,7 +26,7 @@ public sealed class DependencyGraphStageTests
             [
                 new TiaProjectObjectNode("FB", "FB_Main", "Project/PLC/Blocks/FB_Main", 2, new Dictionary<string, string>
                 {
-                    ["Calls"] = "FC_Helper, DB_Config",
+                    ["Calls"] = "FC_Helper, Project\\PLC\\Blocks\\DB_Config",
                     ["Uses"] = "UDT_Motor",
                     ["TagUsage"] = "Tag_Start, Tag_Stop"
                 }),
@@ -45,7 +45,7 @@ public sealed class DependencyGraphStageTests
 
         Assert.Equal("Partial", json.RootElement.GetProperty("status").GetString());
         Assert.True(json.RootElement.GetProperty("summary").GetProperty("edgeCount").GetInt32() >= 5);
-        Assert.True(json.RootElement.GetProperty("summary").GetProperty("resolvedEdges").GetInt32() >= 3);
+        Assert.True(json.RootElement.GetProperty("summary").GetProperty("resolvedEdges").GetInt32() >= 4);
         Assert.True(json.RootElement.GetProperty("summary").GetProperty("unresolvedEdges").GetInt32() >= 1);
 
         var edges = json.RootElement.GetProperty("edges").EnumerateArray().ToArray();

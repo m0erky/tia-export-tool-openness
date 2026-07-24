@@ -10,6 +10,7 @@ namespace TiaProjectExporter.Export.Stages;
 /// </summary>
 public sealed class BlockCallGraphStage : IExportStage
 {
+    private static readonly char[] DependencySeparators = [',', ';', '|'];
     /// <inheritdoc />
     public string Name => "Block Call Graph";
 
@@ -190,8 +191,7 @@ public sealed class BlockCallGraphStage : IExportStage
 
     private static IEnumerable<string> SplitValues(string raw)
     {
-        char[] separators = [',', ';', '|'];
-        return raw.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return raw.Split(DependencySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static bool IsEntryPoint(IReadOnlyDictionary<string, string>? metadata, string objectType) =>

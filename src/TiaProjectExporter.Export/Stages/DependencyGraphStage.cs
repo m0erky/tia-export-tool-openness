@@ -11,6 +11,7 @@ namespace TiaProjectExporter.Export.Stages;
 /// </summary>
 public sealed class DependencyGraphStage : IExportStage
 {
+    private static readonly char[] DependencySeparators = [',', ';', '|'];
     private static readonly IReadOnlyDictionary<string, string> RelationshipByMetadataKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["Calls"] = "Calls",
@@ -97,7 +98,7 @@ public sealed class DependencyGraphStage : IExportStage
                 Target = relation.Target,
                 Relationship = relation.Relationship,
                 relation.MetadataKey,
-                Resolved = IsResolvedTarget(relation.Target, nodeIds, nodeNames)
+                Resolved = RelationshipTargetResolver.IsResolvedTarget(relation.Target, nodeIds, nodeNames)
             }))
             .DistinctBy(edge => $"{edge.SourceId}|{edge.Target}|{edge.Relationship}")
             .OrderBy(edge => edge.SourceId, StringComparer.Ordinal)
@@ -168,22 +169,11 @@ public sealed class DependencyGraphStage : IExportStage
             .ToArray();
     }
 
-    private static bool IsResolvedTarget(string target, IReadOnlySet<string> nodeIds, IReadOnlySet<string> nodeNames)
-    {
-        if (nodeIds.Contains(target) || nodeNames.Contains(target))
-        {
-            return true;
-        }
-
-        return nodeIds.Any(nodeId => nodeId.EndsWith($"/{target}", StringComparison.OrdinalIgnoreCase));
-    }
-
     private static IEnumerable<string> SplitDependencies(string raw)
     {
-        char[] separators = [',', ';', '|'];
-
         return raw
-            .Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Split(DependencySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(RelationshipTargetResolver.NormalizeTarget)
             .Where(token => !string.IsNullOrWhiteSpace(token));
     }
 

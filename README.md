@@ -26,6 +26,7 @@ TIA projects are rich but difficult to diff, inspect, and analyze outside TIA Po
 - Generates analysis artifacts, including:
   - call graph
   - dependency graph
+  - executive summary
   - relationship insights
   - coverage matrix
   - readiness scoring
@@ -34,6 +35,7 @@ TIA projects are rich but difficult to diff, inspect, and analyze outside TIA Po
   - typed-extractor implementation backlog
   - mapping implementation tracker with cross-run trend
   - domain extractor coverage matrix and gap list
+  - validation workflow assets for Windows (`docs/WINDOWS_VALIDATION.md`, `scripts/validate-windows.ps1`)
 
 ## Architecture
 
@@ -84,6 +86,11 @@ dotnet build TiaProjectExporter.sln
 dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj
 ```
 
+Windows validation workflow artifacts:
+
+- `docs/WINDOWS_VALIDATION.md`
+- `scripts/validate-windows.ps1`
+
 ## How to use the UI
 
 1. Start `TiaProjectExporter.UI`.
@@ -128,6 +135,7 @@ Representative generated files:
 
 - `README.md`
 - `PROJECT_OVERVIEW.md`
+- `EXECUTIVE_SUMMARY.md`
 - `EXPORT_REPORT.md`
 - `PROJECT_STATISTICS.json`
 - `BLOCK_CALL_GRAPH.md`
@@ -152,6 +160,7 @@ Representative generated files:
 - `Reports/MAPPING_IMPLEMENTATION_TRACKER_HISTORY.json`
 - `Reports/DOMAIN_EXTRACTOR_COVERAGE.json`
 - `Reports/DOMAIN_EXTRACTOR_COVERAGE.md`
+- `Reports/EXECUTIVE_SUMMARY.json`
 
 ## Configuration
 
