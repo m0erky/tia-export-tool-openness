@@ -46,7 +46,6 @@ Scope:
 ## TODO List
 
 - Implement a concrete Siemens Openness-backed inventory provider for project metadata, device tree, and software discovery.
-- Add cancellation support through the UI workflow.
 - Add configuration persistence for recent output folders and export format selections.
 - Add unit tests for repository layout generation and TIA installation discovery edge cases.
 - Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
@@ -74,11 +73,13 @@ Scope:
 - Replaced the placeholder inventory provider with `OpennessBackedTiaProjectInventoryProvider`, including robust exception-to-issue handling.
 - Added a placeholder `UnavailableTiaProjectOpennessAdapter` to keep non-Windows and non-Siemens environments functional while preserving architecture boundaries.
 - Added xUnit coverage for inventory provider status mapping (missing path, partial traversal, traversal failure).
+- Added export cancellation support in the WPF MVVM workflow with `CancelExportCommand`, cooperative `CancellationTokenSource` handling, and cancellation-specific UI status updates.
 
 ## Known Issues
 
 - TIA Portal Openness assemblies are Windows-only and cannot be executed in the current Linux workspace.
 - WPF build/runtime verification still needs confirmation on a Windows machine with the Windows Desktop workload installed.
+- WPF cancellation behavior is implemented but still requires Windows runtime validation against real long-running export stages.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
 - TIA project inventory export currently emits placeholder availability/status artifacts until the Siemens Openness adapter is implemented.
 - Siemens.Engineering integration is still pending; current Openness adapter intentionally returns structured placeholder issues.

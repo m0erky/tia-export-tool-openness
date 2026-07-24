@@ -98,8 +98,12 @@
                                 Command="{Binding DiscoverVersionsCommand}"
                                 Content="Detect TIA Versions" />
                         <Button Width="150"
+                                Margin="0,0,10,0"
                                 Command="{Binding ExportCommand}"
                                 Content="Run Export" />
+                        <Button Width="120"
+                                Command="{Binding CancelExportCommand}"
+                                Content="Cancel Export" />
                     </StackPanel>
 
                     <TextBlock Margin="0,18,0,6"
@@ -213,6 +217,6 @@
         <TextBlock Grid.Row="2"
                    VerticalAlignment="Bottom"
                    Foreground="#52624D"
-                   Text="Milestone 1 provides repository skeleton export, resilient pipeline orchestration, and initial TIA installation detection." />
+                   Text="Milestone 2 includes inventory-driven reporting, Openness traversal abstractions, and cancellable export workflow." />
     </Grid>
 </Window>

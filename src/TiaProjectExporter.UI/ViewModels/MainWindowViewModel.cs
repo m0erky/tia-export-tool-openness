@@ -31,6 +31,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private int _succeededCount;
     private int _failedCount;
     private int _issueCount;
+    private bool _isExporting;
+    private CancellationTokenSource? _exportCancellationTokenSource;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainWindowViewModel"/> class.
@@ -52,6 +54,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         DiscoverVersionsCommand = new AsyncRelayCommand(DiscoverVersionsAsync, onExceptionAsync: HandleCommandExceptionAsync);
         ExportCommand = new AsyncRelayCommand(ExportAsync, CanExport, HandleCommandExceptionAsync);
+        CancelExportCommand = new AsyncRelayCommand(CancelExportAsync, CanCancelExport, HandleCommandExceptionAsync);
 
         logCollector.EntryAdded += OnLogEntryAdded;
     }
@@ -75,6 +78,11 @@ public sealed class MainWindowViewModel : ObservableObject
     /// Gets the command that starts the export.
     /// </summary>
     public AsyncRelayCommand ExportCommand { get; }
+
+    /// <summary>
+    /// Gets the command that requests cancellation of the current export run.
+    /// </summary>
+    public AsyncRelayCommand CancelExportCommand { get; }
 
     /// <summary>
     /// Gets or sets the output directory.
@@ -217,6 +225,22 @@ public sealed class MainWindowViewModel : ObservableObject
         set => SetProperty(ref _issueCount, value);
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether an export is currently running.
+    /// </summary>
+    public bool IsExporting
+    {
+        get => _isExporting;
+        private set
+        {
+            if (SetProperty(ref _isExporting, value))
+            {
+                ExportCommand.RaiseCanExecuteChanged();
+                CancelExportCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     private async Task DiscoverVersionsAsync()
     {
         StatusText = "Detecting installed TIA versions";
@@ -243,25 +267,61 @@ public sealed class MainWindowViewModel : ObservableObject
         ProgressText = "Preparing repository export";
         CurrentObject = "Initializing";
         ProgressPercent = 0;
+        SucceededCount = 0;
+        FailedCount = 0;
+        IssueCount = 0;
 
-        var options = new ExportOptions(
-            string.IsNullOrWhiteSpace(ProjectPath) ? null : ProjectPath,
-            OutputDirectory,
-            BuildFormats(),
-            EnableCompression,
-            SkipDiagnostics,
-            ExportMarkdown);
+        using var cancellationTokenSource = new CancellationTokenSource();
+        _exportCancellationTokenSource = cancellationTokenSource;
+        IsExporting = true;
 
-        var report = await _exportCoordinator.ExecuteAsync(options, HandleProgressAsync, CancellationToken.None);
+        try
+        {
+            var options = new ExportOptions(
+                string.IsNullOrWhiteSpace(ProjectPath) ? null : ProjectPath,
+                OutputDirectory,
+                BuildFormats(),
+                EnableCompression,
+                SkipDiagnostics,
+                ExportMarkdown);
 
-        SucceededCount = report.SucceededCount;
-        FailedCount = report.FailedCount;
-        IssueCount = report.Issues.Count;
-        StatusText = report.FailedCount == 0 ? "Export completed" : "Export completed with issues";
-        ProgressText = $"{report.SucceededCount} succeeded, {report.FailedCount} failed";
-        CurrentObject = "Export finished";
-        EstimatedRemainingText = "No remaining work";
-        ProgressPercent = 100;
+            var report = await _exportCoordinator.ExecuteAsync(options, HandleProgressAsync, cancellationTokenSource.Token);
+
+            SucceededCount = report.SucceededCount;
+            FailedCount = report.FailedCount;
+            IssueCount = report.Issues.Count;
+            StatusText = report.FailedCount == 0 ? "Export completed" : "Export completed with issues";
+            ProgressText = $"{report.SucceededCount} succeeded, {report.FailedCount} failed";
+            CurrentObject = "Export finished";
+            EstimatedRemainingText = "No remaining work";
+            ProgressPercent = 100;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Export canceled";
+            ProgressText = "Export canceled by user";
+            CurrentObject = "Cancellation requested";
+            EstimatedRemainingText = "No remaining work";
+            _logCollector.Add("Export canceled by user request.");
+        }
+        finally
+        {
+            _exportCancellationTokenSource = null;
+            IsExporting = false;
+        }
+    }
+
+    private Task CancelExportAsync()
+    {
+        if (_exportCancellationTokenSource is { IsCancellationRequested: false })
+        {
+            _exportCancellationTokenSource.Cancel();
+            StatusText = "Cancelling export";
+            CurrentObject = "Waiting for active stage to stop";
+            EstimatedRemainingText = "Cancellation in progress";
+        }
+
+        return Task.CompletedTask;
     }
 
     private Task HandleProgressAsync(ExportProgressUpdate update)
@@ -279,7 +339,9 @@ public sealed class MainWindowViewModel : ObservableObject
         }).Task;
     }
 
-    private bool CanExport() => !string.IsNullOrWhiteSpace(OutputDirectory);
+    private bool CanExport() => !IsExporting && !string.IsNullOrWhiteSpace(OutputDirectory);
+
+    private bool CanCancelExport() => IsExporting && _exportCancellationTokenSource is { IsCancellationRequested: false };
 
     private Task HandleCommandExceptionAsync(Exception exception)
     {
