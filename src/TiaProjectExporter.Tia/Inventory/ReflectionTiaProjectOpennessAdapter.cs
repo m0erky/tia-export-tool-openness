@@ -328,6 +328,7 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
 
         var queue = new Queue<(object Node, string Path, int Depth)>();
         var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        var discoveredKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         queue.Enqueue((device, $"Project/Devices/{deviceName}", 2));
 
         var discoveredCount = 0;
@@ -360,7 +361,14 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
 
                 if (objectType is not null)
                 {
-                    var metadata = BuildMetadata(child);
+                    var dedupKey = $"{objectType}|{childPath}";
+
+                    if (!discoveredKeys.Add(dedupKey))
+                    {
+                        continue;
+                    }
+
+                    var metadata = BuildMetadata(child, objectType);
 
                     objects.Add(new TiaProjectObjectNode(
                         ObjectType: objectType,
@@ -420,7 +428,7 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
                 continue;
             }
 
-            if (value is IEnumerable enumerable and value is not string)
+            if (value is IEnumerable enumerable && value is not string)
             {
                 foreach (var item in enumerable)
                 {
@@ -510,12 +518,15 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
         return null;
     }
 
-    private static IReadOnlyDictionary<string, string> BuildMetadata(object node)
+    private static IReadOnlyDictionary<string, string> BuildMetadata(object node, string objectType)
     {
         var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["RuntimeType"] = node.GetType().FullName ?? node.GetType().Name
         };
+
+        metadata["ExtractionConfidence"] = CalculateConfidence(node, objectType).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        metadata["ExtractionStrategy"] = "ReflectionHeuristic";
 
         AddMetadataIfPresent(node, metadata, "Comment", "Comment");
         AddMetadataIfPresent(node, metadata, "Title", "Title");
@@ -539,6 +550,52 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
         }
 
         return metadata;
+    }
+
+    private static double CalculateConfidence(object node, string objectType)
+    {
+        var score = 0.35;
+
+        var runtimeTypeName = node.GetType().Name;
+        if (runtimeTypeName.Contains(objectType, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 0.30;
+        }
+
+        var name = TryReadString(node, "Name");
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            score += 0.15;
+        }
+
+        if (!string.IsNullOrWhiteSpace(TryReadString(node, "DisplayName")))
+        {
+            score += 0.05;
+        }
+
+        var metadataHints = 0;
+
+        if (!string.IsNullOrWhiteSpace(TryReadString(node, "Comment")))
+        {
+            metadataHints++;
+        }
+
+        if (!string.IsNullOrWhiteSpace(TryReadString(node, "Description")))
+        {
+            metadataHints++;
+        }
+
+        if (!string.IsNullOrWhiteSpace(TryReadString(node, "Title")))
+        {
+            metadataHints++;
+        }
+
+        if (metadataHints > 0)
+        {
+            score += Math.Min(0.15, metadataHints * 0.05);
+        }
+
+        return Math.Clamp(score, 0.0, 0.99);
     }
 
     private static void AddMetadataIfPresent(object node, IDictionary<string, string> metadata, string propertyName, string metadataKey)

@@ -97,6 +97,7 @@ Scope:
 - Enhanced report/statistics generation with archive metadata sections (`Packaging` in `EXPORT_REPORT.md` and `archive` in `PROJECT_STATISTICS.json`).
 - Added archive metadata enrichment with `ExportArchiveInfo` (size and SHA-256) captured during compression and surfaced in report/statistics outputs.
 - Extended the reflection-based Siemens Openness adapter to traverse software-level runtime object graphs (beyond devices) and emit categorized nodes (`OB`, `FB`, `FC`, `DB`, `Block`, `Tag`, `UDT`, `Screen`, `Faceplate`, `HMI`) with metadata and reference heuristics (`Calls`, `Dependencies`, multilingual text hints).
+- Improved reflective traversal output quality with duplicate suppression (type+path key), extraction-confidence tagging (`ExtractionConfidence`), and explicit extraction strategy metadata (`ExtractionStrategy=ReflectionHeuristic`).
 
 ## Known Issues
 
