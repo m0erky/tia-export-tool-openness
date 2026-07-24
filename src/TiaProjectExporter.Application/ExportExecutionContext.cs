@@ -29,6 +29,16 @@ public sealed class ExportExecutionContext
     }
 
     /// <summary>
+    /// Gets the accumulated export results.
+    /// </summary>
+    public IReadOnlyList<ExportedObjectResult> Results => _results;
+
+    /// <summary>
+    /// Gets the accumulated recoverable issues.
+    /// </summary>
+    public IReadOnlyList<ExportIssue> Issues => _issues;
+
+    /// <summary>
     /// Gets the selected export options.
     /// </summary>
     public ExportOptions Options { get; }
@@ -75,4 +85,3 @@ public sealed class ExportExecutionContext
     public ExportReport BuildReport() =>
         new(StartedAt, DateTimeOffset.UtcNow, _results.ToArray(), _issues.ToArray());
 }
-

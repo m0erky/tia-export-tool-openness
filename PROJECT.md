@@ -47,7 +47,6 @@ Scope:
 
 - Define `ITiaProjectOpennessAdapter` and traversal abstractions for project/object enumeration.
 - Implement a concrete Siemens Openness-backed inventory provider for project metadata, device tree, and software discovery.
-- Generate real `EXPORT_REPORT.md`, `PROJECT_STATISTICS.json`, and `PROJECT_OVERVIEW.md` content from execution results.
 - Add cancellation support through the UI workflow.
 - Add configuration persistence for recent output folders and export format selections.
 - Add unit tests for repository layout generation and TIA installation discovery edge cases.
@@ -70,6 +69,8 @@ Scope:
 - Extended the UI with a source TIA project path field so the next milestone can attach real project traversal.
 - Fixed the test project references/imports so Linux-based non-WPF test execution works with the .NET 8 SDK.
 - Verified `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj` passes on Ubuntu 24.04 with .NET SDK 8.0.129.
+- Replaced placeholder report artifacts with execution-driven generation for `PROJECT_OVERVIEW.md`, `PROJECT_STATISTICS.json`, and `EXPORT_REPORT.md`.
+- Added an `ExportReportStage` plus tests that verify report outputs are generated from real results/issues.
 
 ## Known Issues
 
@@ -77,6 +78,7 @@ Scope:
 - WPF build/runtime verification still needs confirmation on a Windows machine with the Windows Desktop workload installed.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
 - TIA project inventory export currently emits placeholder availability/status artifacts until the Siemens Openness adapter is implemented.
+- `FILE_INDEX.json`, `SEARCH_INDEX.json`, and `BLOCK_CALL_GRAPH.md` are still placeholder-first and need deep object-level export data.
 
 ## Future Improvements
 

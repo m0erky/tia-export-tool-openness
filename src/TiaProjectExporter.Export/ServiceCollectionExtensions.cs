@@ -16,7 +16,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IExportStage, RepositoryLayoutStage>();
         services.AddSingleton<IExportStage, ProjectInventoryStage>();
+        services.AddSingleton<IExportStage, ExportReportStage>();
         return services;
     }
 }
-
