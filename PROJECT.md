@@ -34,37 +34,46 @@ Architectural decisions:
 
 ## Current Milestone
 
-Milestone 1: Solution foundation
+Milestone 2: TIA project traversal and object inventory
 
 Scope:
 
-- Create the modular .NET 8 solution structure.
-- Establish core export contracts and resilient orchestration primitives.
-- Add WPF shell with MVVM, DI, config, and logging.
-- Add initial installed-version detection abstraction for TIA V18/V19/V20.
-- Add first unit tests and verify the solution builds.
+- Define TIA project traversal contracts that isolate Siemens Openness objects from the rest of the system.
+- Add the first inventory/export use case for project metadata, device tree, and software object enumeration.
+- Expand generated reports from placeholder repository files to real discovered content.
+- Prepare the pipeline for per-object exporters and resilient export reporting.
 
 ## TODO List
 
-- Create the solution and project structure for all architectural layers.
-- Implement base domain models for export sessions, discovered TIA versions, export items, and reports.
-- Implement application orchestration for a non-crashing export pipeline.
-- Implement file-based export writer abstractions for JSON/XML/Markdown.
-- Implement initial Windows registry-based TIA installation detection service.
-- Implement WPF shell with configuration-backed settings and progress/logging view models.
-- Add unit tests for pipeline resilience and report aggregation.
-- Add placeholder documentation for build/run constraints on non-Windows environments.
-- Define next milestone for real TIA project discovery and repository layout generation.
+- Define `ITiaProjectOpennessAdapter` and traversal abstractions for project/object enumeration.
+- Implement the first TIA project inventory stage that exports discovered project metadata and object counts.
+- Generate real `EXPORT_REPORT.md`, `PROJECT_STATISTICS.json`, and `PROJECT_OVERVIEW.md` content from execution results.
+- Add cancellation support through the UI workflow.
+- Add configuration persistence for recent output folders and export format selections.
+- Add unit tests for repository layout generation and TIA installation discovery edge cases.
+- Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
+- Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
 
 ## Completed Tasks
 
-- Documented the target architecture and first milestone.
+- Documented the target architecture, milestone plan, and build constraints.
+- Created the modular .NET 8 solution structure for `Core`, `Application`, `Infrastructure`, `TIA`, `Export`, `UI`, and `Tests`.
+- Added strict shared build settings and central package version management.
+- Implemented core export models for options, progress updates, results, issues, and reports.
+- Implemented a resilient application export coordinator that continues when individual stages fail.
+- Added file-system-based artifact writer abstractions with runtime output-root selection.
+- Implemented the initial export stage that generates the target repository skeleton and AI-oriented placeholder files.
+- Implemented Windows registry-based discovery abstraction for supported TIA Portal V18/V19/V20 installations.
+- Added the first WPF MVVM shell with dependency injection, configuration loading, logging, progress display, statistics, and installed-version detection.
+- Added initial xUnit tests for pipeline resilience and progress propagation.
 
 ## Known Issues
 
-- No code exists yet.
+- The current workspace does not contain the `.NET` SDK, so restore/build/test verification could not be executed locally.
 - TIA Portal Openness assemblies are Windows-only and cannot be executed in the current Linux workspace.
-- WPF build/runtime verification may be limited in the current environment if Windows desktop targeting packs are unavailable.
+- WPF build/runtime verification still needs confirmation on a Windows machine with the Windows Desktop workload installed.
+- Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
+- Exported repository files are still placeholder summaries until real TIA project traversal is implemented.
 
 ## Future Improvements
 
@@ -77,7 +86,7 @@ Scope:
 
 ## Build Instructions
 
-Planned local build commands:
+Expected local build commands:
 
 ```bash
 dotnet restore
@@ -89,3 +98,4 @@ Windows-specific notes:
 
 - The UI project targets WPF and should be built on Windows with the .NET 8 SDK and Windows Desktop workload available.
 - TIA Openness integration requires Siemens TIA Portal installations and compatible Openness assemblies for V18/V19/V20.
+- The current development workspace used for this milestone did not have `dotnet` installed, so these commands were not executed here.

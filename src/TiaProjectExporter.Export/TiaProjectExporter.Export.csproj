@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TiaProjectExporter.Core\TiaProjectExporter.Core.csproj" />
+    <ProjectReference Include="..\TiaProjectExporter.Application\TiaProjectExporter.Application.csproj" />
+    <ProjectReference Include="..\TiaProjectExporter.Infrastructure\TiaProjectExporter.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
+

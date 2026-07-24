@@ -1,0 +1,215 @@
+<Window x:Class="TiaProjectExporter.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="TIA Project Exporter"
+        Width="1280"
+        Height="820"
+        MinWidth="980"
+        MinHeight="680"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Padding="20"
+                Background="#132A13"
+                CornerRadius="12">
+            <DockPanel>
+                <StackPanel>
+                    <TextBlock FontSize="28"
+                               FontWeight="SemiBold"
+                               Foreground="White"
+                               Text="TIA Project Exporter" />
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="#D8F3DC"
+                               Text="AI-friendly Siemens TIA Portal project export for Git, VS Code, and LLM workflows." />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Right"
+                            HorizontalAlignment="Right">
+                    <TextBlock HorizontalAlignment="Right"
+                               Foreground="#D8F3DC"
+                               Text="{Binding StatusText}" />
+                    <TextBlock Margin="0,6,0,0"
+                               HorizontalAlignment="Right"
+                               FontWeight="SemiBold"
+                               Foreground="White"
+                               Text="{Binding ProgressText}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="1"
+              Margin="0,18,0,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="3*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Margin="0,0,12,0"
+                    Padding="18"
+                    BorderBrush="#B7C9B2"
+                    BorderThickness="1"
+                    CornerRadius="10">
+                <StackPanel>
+                    <TextBlock FontSize="18"
+                               FontWeight="SemiBold"
+                               Text="Export Settings" />
+
+                    <TextBlock Margin="0,16,0,4"
+                               Text="Output Folder" />
+                    <TextBox Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Margin="0,16,0,6"
+                               Text="Formats" />
+                    <WrapPanel>
+                        <CheckBox Margin="0,0,12,0"
+                                  Content="JSON"
+                                  IsChecked="{Binding ExportJson}" />
+                        <CheckBox Margin="0,0,12,0"
+                                  Content="XML"
+                                  IsChecked="{Binding ExportXml}" />
+                        <CheckBox Content="Markdown"
+                                  IsChecked="{Binding ExportMarkdown}" />
+                    </WrapPanel>
+
+                    <CheckBox Margin="0,16,0,0"
+                              Content="Enable compression"
+                              IsChecked="{Binding EnableCompression}" />
+                    <CheckBox Margin="0,10,0,0"
+                              Content="Skip diagnostics"
+                              IsChecked="{Binding SkipDiagnostics}" />
+
+                    <StackPanel Margin="0,22,0,0"
+                                Orientation="Horizontal">
+                        <Button Width="170"
+                                Margin="0,0,10,0"
+                                Command="{Binding DiscoverVersionsCommand}"
+                                Content="Detect TIA Versions" />
+                        <Button Width="150"
+                                Command="{Binding ExportCommand}"
+                                Content="Run Export" />
+                    </StackPanel>
+
+                    <TextBlock Margin="0,18,0,6"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Text="Installed Versions" />
+                    <ListBox Height="220"
+                             ItemsSource="{Binding Installations}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="10"
+                                        Margin="0,0,0,8"
+                                        Background="#F8FBF5"
+                                        BorderBrush="#DDE7D7"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold"
+                                                   Text="{Binding DisplayName}" />
+                                        <TextBlock Margin="0,4,0,0"
+                                                   Foreground="#52624D"
+                                                   Text="{Binding InstallPath}" />
+                                        <TextBlock Margin="0,4,0,0"
+                                                   Text="{Binding OpennessAvailable, StringFormat=Openness available: {0}}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        Padding="18"
+                        BorderBrush="#B7C9B2"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Text="Progress" />
+                        <TextBlock Margin="0,14,0,4"
+                                   Text="{Binding CurrentObject}" />
+                        <ProgressBar Height="18"
+                                     Maximum="100"
+                                     Value="{Binding ProgressPercent}" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Foreground="#52624D"
+                                   Text="{Binding EstimatedRemainingText}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="1"
+                        Margin="0,12,0,12"
+                        Padding="18"
+                        BorderBrush="#B7C9B2"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel Margin="0,0,30,0">
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="Succeeded" />
+                            <TextBlock FontSize="24"
+                                       Text="{Binding SucceededCount}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,30,0">
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="Failed" />
+                            <TextBlock FontSize="24"
+                                       Text="{Binding FailedCount}" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="Issues" />
+                            <TextBlock FontSize="24"
+                                       Text="{Binding IssueCount}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2"
+                        Padding="18"
+                        BorderBrush="#B7C9B2"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Text="Log Output" />
+                        <ListBox Grid.Row="1"
+                                 Margin="0,14,0,0"
+                                 ItemsSource="{Binding LogEntries}"
+                                 FontFamily="Consolas" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <TextBlock Grid.Row="2"
+                   VerticalAlignment="Bottom"
+                   Foreground="#52624D"
+                   Text="Milestone 1 provides repository skeleton export, resilient pipeline orchestration, and initial TIA installation detection." />
+    </Grid>
+</Window>
+
