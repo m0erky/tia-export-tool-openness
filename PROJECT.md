@@ -100,6 +100,8 @@ Scope:
 - Improved reflective traversal output quality with duplicate suppression (type+path key), extraction-confidence tagging (`ExtractionConfidence`), and explicit extraction strategy metadata (`ExtractionStrategy=ReflectionHeuristic`).
 - Introduced a typed Openness domain-extractor architecture (`ITiaDomainExtractor`) with first explicit extractor slices for PLC Blocks, PLC Tags, PLC Data Types, and HMI runtime objects, wired into the reflection adapter for modular maximum-coverage expansion.
 - Added `ExportCoverageMatrixStage` to produce `EXPORT_COVERAGE_MATRIX.json` and `EXPORT_COVERAGE_MATRIX.md`, including domain-by-domain discovered counts, high-confidence counts, issue counts, and normalized coverage status (`CompleteCandidate`, `PartialCandidate`, `LowConfidence`, `NotDiscovered`).
+- Added explicit `HardwareDomainExtractor` and `NetworkDomainExtractor` implementations and wired them into typed Openness extraction, expanding structured domain coverage beyond PLC/HMI.
+- Added focused extractor unit tests covering hardware-module and PROFINET connection extraction behavior.
 
 ## Known Issues
 
@@ -120,6 +122,7 @@ Scope:
 - Reflection traversal now includes breadth/depth-limited graph walking; real-world validation on V18/V19/V20 projects is still required to tune false positives/duplicates and object classification heuristics.
 - Typed domain extractor coverage is still partial and must be expanded domain-by-domain (Network, Hardware modules, Technology objects, Libraries, Diagnostics, Users/Audit, full HMI internals) to reach maximum-possible export completeness.
 - Coverage matrix statuses are currently candidate-level heuristics and should be mapped to explicit Siemens API capability checks for final production completeness auditing.
+- Network/hardware extractor classification is currently heuristic by runtime type names and should be hardened against real V18/V19/V20 runtime type catalogs.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements
