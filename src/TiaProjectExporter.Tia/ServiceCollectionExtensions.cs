@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Tia.Discovery;
 using TiaProjectExporter.Tia.Inventory;
+using TiaProjectExporter.Tia.Inventory.Extraction;
 
 namespace TiaProjectExporter.Tia;
 
@@ -16,6 +17,10 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTiaServices(this IServiceCollection services)
     {
         services.AddSingleton<ITiaInstallationDiscoveryService, RegistryTiaInstallationDiscoveryService>();
+        services.AddSingleton<ITiaDomainExtractor, PlcBlockDomainExtractor>();
+        services.AddSingleton<ITiaDomainExtractor, PlcTagDomainExtractor>();
+        services.AddSingleton<ITiaDomainExtractor, PlcDataTypeDomainExtractor>();
+        services.AddSingleton<ITiaDomainExtractor, HmiDomainExtractor>();
         services.AddSingleton<ITiaProjectOpennessAdapter, ReflectionTiaProjectOpennessAdapter>();
         services.AddSingleton<ITiaProjectInventoryProvider, OpennessBackedTiaProjectInventoryProvider>();
         return services;

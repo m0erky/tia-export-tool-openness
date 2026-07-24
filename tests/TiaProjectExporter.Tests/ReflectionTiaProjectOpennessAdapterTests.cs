@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Core.Models;
 using TiaProjectExporter.Tia.Inventory;
+using TiaProjectExporter.Tia.Inventory.Extraction;
 
 namespace TiaProjectExporter.Tests;
 
@@ -17,6 +18,7 @@ public sealed class ReflectionTiaProjectOpennessAdapterTests
 
         var adapter = new ReflectionTiaProjectOpennessAdapter(
             new StubDiscoveryService(Array.Empty<DiscoveredTiaPortalInstallation>()),
+            Array.Empty<ITiaDomainExtractor>(),
             NullLogger<ReflectionTiaProjectOpennessAdapter>.Instance);
 
         var result = await adapter.TraverseAsync("/tmp/sample.ap18", CancellationToken.None);
