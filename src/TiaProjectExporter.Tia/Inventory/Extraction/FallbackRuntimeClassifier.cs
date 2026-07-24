@@ -50,7 +50,8 @@ public static class FallbackRuntimeClassifier
             return new FallbackRuntimeClassification("PLC", "UnmappedPlcNode");
         }
 
-        if (Matches(runtimeTypeName, qualifiedPath, "project", "group", "folder", "node", "container", "tree"))
+        if (runtimeTypeName.Contains("Project", StringComparison.OrdinalIgnoreCase)
+            || Matches(runtimeTypeName, qualifiedPath, "group", "folder", "node", "container", "tree"))
         {
             return new FallbackRuntimeClassification("Project", "UnmappedProjectNode");
         }

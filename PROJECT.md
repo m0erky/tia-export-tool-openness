@@ -117,6 +117,7 @@ Scope:
 - Extended tests for hardware/network metadata enrichment and fallback hotspot reporting.
 - Added a domain-aware fallback runtime classifier so unmapped reflection nodes are categorized into `Project`, `Hardware`, `Network`, `PLC`, `HMI`, `Technology`, `Libraries`, `Diagnostics`, and `UsersAudit` buckets with dedicated object types.
 - Added unit tests for fallback runtime classification behavior across key Siemens runtime-type patterns.
+- Hardened fallback classifier project-domain matching to avoid false-positive classification caused by generic root `Project/...` path prefixes.
 
 ## Known Issues
 
