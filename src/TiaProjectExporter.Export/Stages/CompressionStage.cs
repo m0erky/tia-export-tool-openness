@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using TiaProjectExporter.Application;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Core.Models;
@@ -38,7 +39,26 @@ public sealed class CompressionStage : IExportStage
             archiveFileName: "Export.zip",
             cancellationToken).ConfigureAwait(false);
 
+        var archiveInfo = await BuildArchiveInfoAsync(archivePath, cancellationToken).ConfigureAwait(false);
+        context.SetArchiveInfo(archiveInfo);
+
         context.AddResult(new ExportedObjectResult("Packaging", "ExportZip", ExportObjectStatus.Succeeded, archivePath));
         await context.ReportProgressAsync(new ExportProgressUpdate(Name, "Export.zip generated", 1, 1, TimeSpan.Zero)).ConfigureAwait(false);
+    }
+
+    private static async Task<ExportArchiveInfo> BuildArchiveInfoAsync(string archivePath, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(archivePath))
+        {
+            return new ExportArchiveInfo(archivePath, SizeBytes: null, Sha256: null, DateTimeOffset.UtcNow);
+        }
+
+        var fileInfo = new FileInfo(archivePath);
+
+        await using var stream = File.OpenRead(archivePath);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+        var sha256 = Convert.ToHexString(hash);
+
+        return new ExportArchiveInfo(archivePath, fileInfo.Length, sha256, DateTimeOffset.UtcNow);
     }
 }

@@ -19,6 +19,8 @@ public sealed class ExportReportStageTests
             NullLogger.Instance);
 
         context.AddResult(new ExportedObjectResult("Stage", "Inventory", ExportObjectStatus.Skipped, "Unavailable"));
+        context.AddResult(new ExportedObjectResult("Packaging", "ExportZip", ExportObjectStatus.Succeeded, "/tmp/out/Export.zip"));
+        context.SetArchiveInfo(new ExportArchiveInfo("/tmp/out/Export.zip", 1024, "ABCDEF", DateTimeOffset.UtcNow));
         context.AddIssue(new ExportIssue("Inventory", "No project path configured"));
 
         var stage = new ExportReportStage();
@@ -32,6 +34,7 @@ public sealed class ExportReportStageTests
         Assert.Contains("Recoverable issues", overview.Content, StringComparison.Ordinal);
         Assert.Contains("Analysis Hub", overview.Content, StringComparison.Ordinal);
         Assert.Contains("Packaging", report.Content, StringComparison.Ordinal);
+        Assert.Contains("Archive SHA-256", report.Content, StringComparison.Ordinal);
         Assert.Contains("Inventory", report.Content, StringComparison.Ordinal);
         using var document = JsonDocument.Parse(statistics.Content);
         var totalsElement = document.RootElement.GetProperty("totals");

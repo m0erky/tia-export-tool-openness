@@ -276,7 +276,10 @@ public sealed class ExportReportStage : IExportStage
             context.Options.EnableCompression,
             ExpectedPath = expectedPath,
             Status = packagingResult?.Status.ToString() ?? (context.Options.EnableCompression ? "Pending" : "Skipped"),
-            ArchivePath = packagingResult?.Message
+            ArchivePath = context.ArchiveInfo?.ArchivePath ?? packagingResult?.Message,
+            context.ArchiveInfo?.SizeBytes,
+            context.ArchiveInfo?.Sha256,
+            context.ArchiveInfo?.GeneratedAt
         };
     }
 
@@ -305,6 +308,16 @@ public sealed class ExportReportStage : IExportStage
         if (!string.IsNullOrWhiteSpace(packagingResult.Message))
         {
             builder.AppendLine($"- Archive output: `{packagingResult.Message}`");
+        }
+
+        if (context.ArchiveInfo?.SizeBytes is long sizeBytes)
+        {
+            builder.AppendLine($"- Archive size: **{sizeBytes} bytes**");
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.ArchiveInfo?.Sha256))
+        {
+            builder.AppendLine($"- Archive SHA-256: `{context.ArchiveInfo.Sha256}`");
         }
     }
 }

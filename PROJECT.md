@@ -95,6 +95,7 @@ Scope:
 - Expanded automated validation to 18 passing xUnit tests.
 - Added root `global.json` pinning .NET SDK `8.0.423` for deterministic local/CI builds.
 - Enhanced report/statistics generation with archive metadata sections (`Packaging` in `EXPORT_REPORT.md` and `archive` in `PROJECT_STATISTICS.json`).
+- Added archive metadata enrichment with `ExportArchiveInfo` (size and SHA-256) captured during compression and surfaced in report/statistics outputs.
 
 ## Known Issues
 
@@ -111,6 +112,7 @@ Scope:
 - Multilingual extraction currently relies on metadata key heuristics and should be extended with direct Siemens language-resource APIs when full traversal is available.
 - ZIP packaging has Linux test coverage but still needs end-to-end Windows validation with real large TIA exports.
 - Current Linux workspace has SDK `8.0.129`; with `global.json` pinned to `8.0.423`, local `dotnet` commands now require installing SDK `8.0.423` first.
+- In this sandbox, running tests with the locally installed `~/.dotnet` SDK can fail due MSBuild named-pipe permission restrictions; verify test pass on a normal host shell/session.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements

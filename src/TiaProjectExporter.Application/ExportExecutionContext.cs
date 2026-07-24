@@ -15,6 +15,7 @@ public sealed class ExportExecutionContext
     private readonly List<ExportedArtifactInfo> _artifacts = [];
     private readonly HashSet<string> _directories = new(StringComparer.OrdinalIgnoreCase);
     private TiaProjectInventory? _inventory;
+    private ExportArchiveInfo? _archiveInfo;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ExportExecutionContext"/> class.
@@ -58,6 +59,11 @@ public sealed class ExportExecutionContext
     public TiaProjectInventory? Inventory => _inventory;
 
     /// <summary>
+    /// Gets the generated archive metadata when compression is executed.
+    /// </summary>
+    public ExportArchiveInfo? ArchiveInfo => _archiveInfo;
+
+    /// <summary>
     /// Gets the selected export options.
     /// </summary>
     public ExportOptions Options { get; }
@@ -96,6 +102,11 @@ public sealed class ExportExecutionContext
     /// Stores the latest inventory snapshot for downstream stages.
     /// </summary>
     public void SetInventory(TiaProjectInventory inventory) => _inventory = inventory;
+
+    /// <summary>
+    /// Stores generated archive metadata for reporting stages.
+    /// </summary>
+    public void SetArchiveInfo(ExportArchiveInfo archiveInfo) => _archiveInfo = archiveInfo;
 
     /// <summary>
     /// Ensures a directory and records it in the execution snapshot.

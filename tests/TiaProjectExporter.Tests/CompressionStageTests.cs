@@ -22,6 +22,7 @@ public sealed class CompressionStageTests
         await stage.ExecuteAsync(context, CancellationToken.None);
 
         Assert.True(archiveService.WasCalled);
+        Assert.NotNull(context.ArchiveInfo);
         var result = Assert.Single(context.Results, item => item.ObjectType == "Packaging");
         Assert.Equal(ExportObjectStatus.Succeeded, result.Status);
     }
