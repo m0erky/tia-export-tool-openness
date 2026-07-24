@@ -20,7 +20,7 @@ public sealed class RepositoryLayoutStage : IExportStage
     {
         foreach (var directory in ExportRepositoryLayout.Directories)
         {
-            await context.ArtifactWriter.EnsureDirectoryAsync(directory, cancellationToken).ConfigureAwait(false);
+            await context.EnsureDirectoryAsync(directory, cancellationToken).ConfigureAwait(false);
         }
 
         var generatedAt = DateTimeOffset.UtcNow;
@@ -74,46 +74,12 @@ public sealed class RepositoryLayoutStage : IExportStage
             },
             jsonOptions);
 
-        var fileIndex = JsonSerializer.Serialize(
-            new
-            {
-                GeneratedAt = generatedAt,
-                Files = new[]
-                {
-                    "Export/README.md",
-                    "Export/PROJECT_OVERVIEW.md",
-                    "Export/BLOCK_CALL_GRAPH.md",
-                    "Export/PROJECT_STATISTICS.json",
-                    "Export/EXPORT_REPORT.md",
-                    "Export/DEPENDENCIES.json",
-                    "Export/FILE_INDEX.json",
-                    "Export/SEARCH_INDEX.json",
-                    "Export/PROJECT_TREE.txt"
-                }
-            },
-            jsonOptions);
-
-        var searchIndex = JsonSerializer.Serialize(
-            new
-            {
-                GeneratedAt = generatedAt,
-                Entries = Array.Empty<object>()
-            },
-            jsonOptions);
-
-        var projectTree = string.Join(
-            Environment.NewLine,
-            ExportRepositoryLayout.Directories.Select(directory => directory.Replace('/', Path.DirectorySeparatorChar)));
-
         await WriteIfEnabledAsync(context, "Export/README.md", ExportFormat.Markdown, readme, cancellationToken).ConfigureAwait(false);
         await WriteIfEnabledAsync(context, "Export/PROJECT_OVERVIEW.md", ExportFormat.Markdown, overview, cancellationToken).ConfigureAwait(false);
         await WriteIfEnabledAsync(context, "Export/BLOCK_CALL_GRAPH.md", ExportFormat.Markdown, callGraph, cancellationToken).ConfigureAwait(false);
         await WriteIfEnabledAsync(context, "Export/EXPORT_REPORT.md", ExportFormat.Markdown, report, cancellationToken).ConfigureAwait(false);
         await WriteIfEnabledAsync(context, "Export/PROJECT_STATISTICS.json", ExportFormat.Json, statistics, cancellationToken).ConfigureAwait(false);
         await WriteIfEnabledAsync(context, "Export/DEPENDENCIES.json", ExportFormat.Json, dependencies, cancellationToken).ConfigureAwait(false);
-        await WriteIfEnabledAsync(context, "Export/FILE_INDEX.json", ExportFormat.Json, fileIndex, cancellationToken).ConfigureAwait(false);
-        await WriteIfEnabledAsync(context, "Export/SEARCH_INDEX.json", ExportFormat.Json, searchIndex, cancellationToken).ConfigureAwait(false);
-        await context.ArtifactWriter.WriteArtifactAsync(new ExportArtifact("Export/PROJECT_TREE.txt", ExportFormat.Markdown, projectTree), cancellationToken).ConfigureAwait(false);
 
         context.AddResult(new ExportedObjectResult("Repository", "InitialLayout", ExportObjectStatus.Succeeded));
         await context.ReportProgressAsync(new ExportProgressUpdate(Name, "Repository skeleton created", 1, 1, TimeSpan.Zero)).ConfigureAwait(false);
@@ -136,7 +102,6 @@ public sealed class RepositoryLayoutStage : IExportStage
             return Task.CompletedTask;
         }
 
-        return context.ArtifactWriter.WriteArtifactAsync(new ExportArtifact(relativePath, format, content), cancellationToken);
+        return context.WriteArtifactAsync(new ExportArtifact(relativePath, format, content), cancellationToken);
     }
 }
-

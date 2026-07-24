@@ -80,6 +80,8 @@ Scope:
 - Added non-Windows adapter safety test coverage and expanded automated validation to 11 passing xUnit tests.
 - Extended the Openness adapter to attempt real runtime operations through reflection: create `TiaPortal` (without UI), open the selected project, and enumerate top-level devices with resilient fallback issue reporting.
 - Added AI-oriented inventory summaries (`AI_PROJECT_SUMMARY`, `AI_HARDWARE_SUMMARY`, `AI_SOFTWARE_SUMMARY`, `AI_PLC_SUMMARY`, `AI_HMI_SUMMARY`, `AI_NETWORK_SUMMARY`) generated from discovered object classifications.
+- Implemented execution-context artifact tracking and a dedicated `ExportIndexStage` that generates `FILE_INDEX.json`, `SEARCH_INDEX.json`, and `PROJECT_TREE.txt` from the actual artifacts/directories produced during the run.
+- Added index-stage unit tests and expanded automated validation to 12 passing xUnit tests.
 
 ## Known Issues
 
@@ -90,7 +92,7 @@ Scope:
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
 - Full Siemens.Engineering object traversal is still pending; the current adapter validates runtime availability and reports structured readiness issues.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
-- `FILE_INDEX.json`, `SEARCH_INDEX.json`, and `BLOCK_CALL_GRAPH.md` are still placeholder-first and need deep object-level export data.
+- `BLOCK_CALL_GRAPH.md` is still placeholder-first and needs block reference extraction from real PLC software traversal.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements

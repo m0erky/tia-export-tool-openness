@@ -38,27 +38,27 @@ public sealed class ProjectInventoryStage : IExportStage
 
         if (context.Options.Formats.Contains(ExportFormat.Json))
         {
-            await context.ArtifactWriter.WriteArtifactAsync(
+            await context.WriteArtifactAsync(
                 new ExportArtifact("Export/Reports/TIA_PROJECT_INVENTORY.json", ExportFormat.Json, inventoryJson),
                 cancellationToken).ConfigureAwait(false);
         }
 
         if (context.Options.Formats.Contains(ExportFormat.Xml))
         {
-            await context.ArtifactWriter.WriteArtifactAsync(
+            await context.WriteArtifactAsync(
                 new ExportArtifact("Export/Reports/TIA_PROJECT_INVENTORY.xml", ExportFormat.Xml, inventoryXml),
                 cancellationToken).ConfigureAwait(false);
         }
 
         if (context.Options.GenerateMarkdownSummaries && context.Options.Formats.Contains(ExportFormat.Markdown))
         {
-            await context.ArtifactWriter.WriteArtifactAsync(
+            await context.WriteArtifactAsync(
                 new ExportArtifact("Export/Reports/TIA_PROJECT_INVENTORY.md", ExportFormat.Markdown, summaryMarkdown),
                 cancellationToken).ConfigureAwait(false);
 
             foreach (var summaryArtifact in BuildAiSummaryArtifacts(inventory))
             {
-                await context.ArtifactWriter.WriteArtifactAsync(summaryArtifact, cancellationToken).ConfigureAwait(false);
+                await context.WriteArtifactAsync(summaryArtifact, cancellationToken).ConfigureAwait(false);
             }
         }
 

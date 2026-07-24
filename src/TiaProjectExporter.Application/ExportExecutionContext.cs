@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Text;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Core.Models;
 
@@ -11,6 +12,8 @@ public sealed class ExportExecutionContext
 {
     private readonly List<ExportIssue> _issues = [];
     private readonly List<ExportedObjectResult> _results = [];
+    private readonly List<ExportedArtifactInfo> _artifacts = [];
+    private readonly HashSet<string> _directories = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ExportExecutionContext"/> class.
@@ -37,6 +40,16 @@ public sealed class ExportExecutionContext
     /// Gets the accumulated recoverable issues.
     /// </summary>
     public IReadOnlyList<ExportIssue> Issues => _issues;
+
+    /// <summary>
+    /// Gets metadata for artifacts written during this run.
+    /// </summary>
+    public IReadOnlyList<ExportedArtifactInfo> Artifacts => _artifacts;
+
+    /// <summary>
+    /// Gets directories ensured during this run.
+    /// </summary>
+    public IReadOnlyCollection<string> Directories => _directories;
 
     /// <summary>
     /// Gets the selected export options.
@@ -72,6 +85,29 @@ public sealed class ExportExecutionContext
     /// Adds a recoverable issue.
     /// </summary>
     public void AddIssue(ExportIssue issue) => _issues.Add(issue);
+
+    /// <summary>
+    /// Ensures a directory and records it in the execution snapshot.
+    /// </summary>
+    public async Task EnsureDirectoryAsync(string relativePath, CancellationToken cancellationToken)
+    {
+        await ArtifactWriter.EnsureDirectoryAsync(relativePath, cancellationToken).ConfigureAwait(false);
+        _directories.Add(relativePath);
+    }
+
+    /// <summary>
+    /// Writes an artifact and records metadata for later index/report generation.
+    /// </summary>
+    public async Task WriteArtifactAsync(ExportArtifact artifact, CancellationToken cancellationToken)
+    {
+        await ArtifactWriter.WriteArtifactAsync(artifact, cancellationToken).ConfigureAwait(false);
+
+        _artifacts.Add(new ExportedArtifactInfo(
+            artifact.RelativePath,
+            artifact.Format,
+            Encoding.UTF8.GetByteCount(artifact.Content),
+            DateTimeOffset.UtcNow));
+    }
 
     /// <summary>
     /// Reports progress to the configured sink.

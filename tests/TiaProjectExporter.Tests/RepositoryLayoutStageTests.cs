@@ -29,7 +29,6 @@ public sealed class RepositoryLayoutStageTests
         }
 
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/README.md");
-        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/PROJECT_TREE.txt");
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/PROJECT_STATISTICS.json");
     }
 
@@ -53,7 +52,6 @@ public sealed class RepositoryLayoutStageTests
         Assert.DoesNotContain(writer.Artifacts, artifact => artifact.RelativePath == "Export/README.md");
         Assert.DoesNotContain(writer.Artifacts, artifact => artifact.RelativePath == "Export/PROJECT_OVERVIEW.md");
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/PROJECT_STATISTICS.json");
-        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/PROJECT_TREE.txt");
     }
 
     private sealed class RecordingArtifactWriter : IExportArtifactWriter

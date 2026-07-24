@@ -28,18 +28,18 @@ public sealed class ExportReportStage : IExportStage
 
         if (context.Options.GenerateMarkdownSummaries && context.Options.Formats.Contains(ExportFormat.Markdown))
         {
-            await context.ArtifactWriter.WriteArtifactAsync(
+            await context.WriteArtifactAsync(
                 new ExportArtifact("Export/PROJECT_OVERVIEW.md", ExportFormat.Markdown, projectOverview),
                 cancellationToken).ConfigureAwait(false);
 
-            await context.ArtifactWriter.WriteArtifactAsync(
+            await context.WriteArtifactAsync(
                 new ExportArtifact("Export/EXPORT_REPORT.md", ExportFormat.Markdown, exportReport),
                 cancellationToken).ConfigureAwait(false);
         }
 
         if (context.Options.Formats.Contains(ExportFormat.Json))
         {
-            await context.ArtifactWriter.WriteArtifactAsync(
+            await context.WriteArtifactAsync(
                 new ExportArtifact("Export/PROJECT_STATISTICS.json", ExportFormat.Json, projectStatistics),
                 cancellationToken).ConfigureAwait(false);
         }
