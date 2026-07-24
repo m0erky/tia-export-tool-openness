@@ -246,7 +246,7 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
         return openMethod.Invoke(projects, [argument]);
     }
 
-    private static void TraverseProjectRoot(
+    private void TraverseProjectRoot(
         object project,
         ICollection<TiaProjectObjectNode> objects,
         ICollection<ExportIssue> issues,
