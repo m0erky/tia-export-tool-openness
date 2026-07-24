@@ -137,6 +137,9 @@ Scope:
 - Added unit tests for next-best-actions artifact generation and prioritized action categories.
 - Fixed a compile-time regression in `NextBestActionsStage` by correcting `IReadOnlyList` cardinality usage (`Count` instead of `Length`) for unresolved-target handling.
 - Fixed Windows/VS2022 UI build regressions by adding missing `System.IO` usage imports in `JsonExporterSettingsStore` and disambiguating WPF dispatcher calls via `System.Windows.Application.Current` in `MainWindowViewModel`.
+- Added `RuntimeTypeCatalogStage` to generate `Export/Reports/RUNTIME_TYPE_CATALOG.json` and `Export/Reports/RUNTIME_TYPE_CATALOG.md` with runtime type frequencies, TIA version context, typed/fallback mapping status, and extractor suggestion text.
+- Registered runtime type catalog generation in the export pipeline to support version-aware mapping expansion work.
+- Added unit tests for runtime type catalog artifact generation and version-aware catalog payload validation.
 
 ## Known Issues
 
@@ -167,6 +170,7 @@ Scope:
 - Relationship insight guidance is currently heuristic and should be augmented with Siemens-native reference IDs and block compilation context when available.
 - Readiness scoring weights are currently heuristic and should be calibrated using real large TIA projects (V18/V19/V20) to align with production export quality expectations.
 - Next-best-actions impact scoring is currently heuristic; thresholds/weights should be tuned against real project outcomes and validated with domain experts.
+- Runtime type catalog currently infers a single TIA version context from runtime metadata and should be extended for multi-version side-by-side analysis when multiple runtimes are observed.
 
 ## Future Improvements
 
