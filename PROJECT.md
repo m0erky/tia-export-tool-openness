@@ -147,6 +147,8 @@ Scope:
 - Added persistent tracker history (`Export/Reports/MAPPING_IMPLEMENTATION_TRACKER_HISTORY.json`) to compare mapping completion progress between consecutive exports.
 - Registered mapping tracker generation in the export pipeline after typed-extractor backlog generation.
 - Added unit tests for mapping implementation tracker artifact generation and cross-run trend detection behavior.
+- Added a root `README.md` with detailed purpose, architecture, prerequisites, Windows/VS2022 usage flow, output artifacts, configuration, reliability model, and limitations.
+- Added explicit documentation maintenance policy to keep `README.md` synchronized with user-visible functionality changes.
 
 ## Known Issues
 
