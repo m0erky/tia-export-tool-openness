@@ -84,6 +84,8 @@ Scope:
 - Added index-stage unit tests and expanded automated validation to 12 passing xUnit tests.
 - Added a dedicated `BlockCallGraphStage` that generates `BLOCK_CALL_GRAPH.md` from inventory block objects and call metadata (Mermaid + block listing) instead of static placeholder text.
 - Added call-graph stage unit tests and expanded automated validation to 13 passing xUnit tests.
+- Added a dedicated `DependencyGraphStage` that generates `DEPENDENCIES.json` from discovered inventory object metadata (`Calls`, `DependsOn`, `Uses`, `References`, `Dependencies`) instead of placeholder output.
+- Expanded automated validation to 14 passing xUnit tests.
 
 ## Known Issues
 
@@ -95,6 +97,7 @@ Scope:
 - Full Siemens.Engineering object traversal is still pending; the current adapter validates runtime availability and reports structured readiness issues.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
+- Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 
 ## Future Improvements

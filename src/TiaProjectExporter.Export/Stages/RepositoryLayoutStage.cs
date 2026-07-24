@@ -45,25 +45,11 @@ public sealed class RepositoryLayoutStage : IExportStage
             This file will contain a project-level AI summary once real project extraction is connected.
             """;
 
-        var callGraph = """
-            # Block Call Graph
-
-            Call graph generation is not implemented in Milestone 1.
-            """;
-
         var report = """
             # Export Report
 
             Milestone 1 generated the repository structure successfully.
             """;
-
-        var dependencies = JsonSerializer.Serialize(
-            new
-            {
-                GeneratedAt = generatedAt,
-                Dependencies = Array.Empty<object>()
-            },
-            jsonOptions);
 
         var statistics = JsonSerializer.Serialize(
             new
@@ -76,10 +62,8 @@ public sealed class RepositoryLayoutStage : IExportStage
 
         await WriteIfEnabledAsync(context, "Export/README.md", ExportFormat.Markdown, readme, cancellationToken).ConfigureAwait(false);
         await WriteIfEnabledAsync(context, "Export/PROJECT_OVERVIEW.md", ExportFormat.Markdown, overview, cancellationToken).ConfigureAwait(false);
-        await WriteIfEnabledAsync(context, "Export/BLOCK_CALL_GRAPH.md", ExportFormat.Markdown, callGraph, cancellationToken).ConfigureAwait(false);
         await WriteIfEnabledAsync(context, "Export/EXPORT_REPORT.md", ExportFormat.Markdown, report, cancellationToken).ConfigureAwait(false);
         await WriteIfEnabledAsync(context, "Export/PROJECT_STATISTICS.json", ExportFormat.Json, statistics, cancellationToken).ConfigureAwait(false);
-        await WriteIfEnabledAsync(context, "Export/DEPENDENCIES.json", ExportFormat.Json, dependencies, cancellationToken).ConfigureAwait(false);
 
         context.AddResult(new ExportedObjectResult("Repository", "InitialLayout", ExportObjectStatus.Succeeded));
         await context.ReportProgressAsync(new ExportProgressUpdate(Name, "Repository skeleton created", 1, 1, TimeSpan.Zero)).ConfigureAwait(false);
