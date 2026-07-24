@@ -46,8 +46,17 @@ public sealed class BlockCallGraphStage : IExportStage
 
         var blocks = inventory.Objects
             .Where(node => IsBlockNode(node.ObjectType))
-            .Select(node => new BlockNode(node.Name, node.ObjectType, node.QualifiedPath, ParseCalls(node.Metadata)))
+            .Select(node => new BlockNode(
+                node.Name,
+                node.ObjectType,
+                node.QualifiedPath,
+                IsEntryPoint(node.Metadata, node.ObjectType),
+                ParseCalls(node.Metadata)))
             .ToArray();
+
+        var knownBlockNames = blocks
+            .Select(block => block.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         builder.AppendLine($"Inventory status: **{inventory.Status}**");
         builder.AppendLine();
@@ -61,10 +70,26 @@ public sealed class BlockCallGraphStage : IExportStage
         }
 
         var edges = blocks
-            .SelectMany(block => block.Calls.Select(target => (Source: block.Name, Target: target)))
-            .Distinct()
+            .SelectMany(block => block.Calls.Select(target => new CallEdge(
+                Source: block.Name,
+                Target: target,
+                Resolved: knownBlockNames.Contains(target))))
+            .DistinctBy(edge => $"{edge.Source}|{edge.Target}")
             .OrderBy(edge => edge.Source, StringComparer.OrdinalIgnoreCase)
             .ThenBy(edge => edge.Target, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var entryPoints = blocks
+            .Where(block => block.IsEntryPoint)
+            .Select(block => block.Name)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var unresolvedTargets = edges
+            .Where(edge => !edge.Resolved)
+            .Select(edge => edge.Target)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(target => target, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         builder.AppendLine("## Mermaid");
@@ -83,12 +108,47 @@ public sealed class BlockCallGraphStage : IExportStage
         {
             foreach (var edge in edges)
             {
-                builder.AppendLine($"    {NormalizeNodeId(edge.Source)}[{EscapeLabel(edge.Source)}] --> {NormalizeNodeId(edge.Target)}[{EscapeLabel(edge.Target)}]");
+                var link = edge.Resolved ? "-->" : "-.->";
+                builder.AppendLine($"    {NormalizeNodeId(edge.Source)}[{EscapeLabel(edge.Source)}] {link} {NormalizeNodeId(edge.Target)}[{EscapeLabel(edge.Target)}]");
             }
         }
 
         builder.AppendLine("```");
         builder.AppendLine();
+        builder.AppendLine("## Summary");
+        builder.AppendLine();
+        builder.AppendLine($"- Call edges: **{edges.Length}**");
+        builder.AppendLine($"- Resolved targets: **{edges.Count(edge => edge.Resolved)}**");
+        builder.AppendLine($"- Unresolved targets: **{unresolvedTargets.Length}**");
+        builder.AppendLine($"- Entry points: **{entryPoints.Length}**");
+        builder.AppendLine();
+
+        if (entryPoints.Length > 0)
+        {
+            builder.AppendLine("### Entry Points");
+            builder.AppendLine();
+
+            foreach (var entryPoint in entryPoints.Take(20))
+            {
+                builder.AppendLine($"- {entryPoint}");
+            }
+
+            builder.AppendLine();
+        }
+
+        if (unresolvedTargets.Length > 0)
+        {
+            builder.AppendLine("### Unresolved Targets");
+            builder.AppendLine();
+
+            foreach (var unresolvedTarget in unresolvedTargets.Take(40))
+            {
+                builder.AppendLine($"- {unresolvedTarget}");
+            }
+
+            builder.AppendLine();
+        }
+
         builder.AppendLine("## Blocks");
         builder.AppendLine();
 
@@ -119,16 +179,27 @@ public sealed class BlockCallGraphStage : IExportStage
             return Array.Empty<string>();
         }
 
-        if (!metadata.TryGetValue("Calls", out var callsRaw) || string.IsNullOrWhiteSpace(callsRaw))
-        {
-            return Array.Empty<string>();
-        }
+        var keys = new[] { "Calls", "BlockCalls", "InvokedBlocks", "CalledBlocks" };
 
-        return callsRaw
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        return keys
+            .Where(metadata.ContainsKey)
+            .SelectMany(key => SplitValues(metadata[key]))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+
+    private static IEnumerable<string> SplitValues(string raw)
+    {
+        char[] separators = [',', ';', '|'];
+        return raw.Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static bool IsEntryPoint(IReadOnlyDictionary<string, string>? metadata, string objectType) =>
+        metadata is not null
+        && metadata.TryGetValue("IsEntryPoint", out var raw)
+        && bool.TryParse(raw, out var value)
+        && value
+        || objectType.Equals("OB", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeNodeId(string value)
     {
@@ -154,5 +225,11 @@ public sealed class BlockCallGraphStage : IExportStage
         string Name,
         string ObjectType,
         string QualifiedPath,
+        bool IsEntryPoint,
         IReadOnlyList<string> Calls);
+
+    private sealed record CallEdge(
+        string Source,
+        string Target,
+        bool Resolved);
 }

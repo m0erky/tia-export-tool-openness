@@ -23,7 +23,8 @@ public sealed class BlockCallGraphStageTests
             ProjectPath: "C:/Projects/Demo.ap19",
             Objects:
             [
-                new TiaProjectObjectNode("FB", "FB_Main", "Project/PLC/Blocks/FB_Main", 2, new Dictionary<string, string> { ["Calls"] = "FC_Helper, DB_Config" }),
+                new TiaProjectObjectNode("OB", "OB1", "Project/PLC/Blocks/OB1", 2, new Dictionary<string, string> { ["Calls"] = "FB_Main" }),
+                new TiaProjectObjectNode("FB", "FB_Main", "Project/PLC/Blocks/FB_Main", 2, new Dictionary<string, string> { ["Calls"] = "FC_Helper; DB_Config; ExternalBlock" }),
                 new TiaProjectObjectNode("FC", "FC_Helper", "Project/PLC/Blocks/FC_Helper", 2),
                 new TiaProjectObjectNode("DB", "DB_Config", "Project/PLC/Blocks/DB_Config", 2)
             ],
@@ -35,8 +36,14 @@ public sealed class BlockCallGraphStageTests
 
         var graphArtifact = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/BLOCK_CALL_GRAPH.md");
         Assert.Contains("mermaid", graphArtifact.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Summary", graphArtifact.Content, StringComparison.Ordinal);
+        Assert.Contains("Entry Points", graphArtifact.Content, StringComparison.Ordinal);
+        Assert.Contains("Unresolved Targets", graphArtifact.Content, StringComparison.Ordinal);
+        Assert.Contains("-.->", graphArtifact.Content, StringComparison.Ordinal);
+        Assert.Contains("OB1", graphArtifact.Content, StringComparison.Ordinal);
         Assert.Contains("FB_Main", graphArtifact.Content, StringComparison.Ordinal);
         Assert.Contains("FC_Helper", graphArtifact.Content, StringComparison.Ordinal);
+        Assert.Contains("ExternalBlock", graphArtifact.Content, StringComparison.Ordinal);
     }
 
     private sealed class RecordingArtifactWriter : IExportArtifactWriter

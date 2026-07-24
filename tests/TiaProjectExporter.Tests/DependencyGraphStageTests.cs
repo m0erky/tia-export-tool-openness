@@ -27,10 +27,12 @@ public sealed class DependencyGraphStageTests
                 new TiaProjectObjectNode("FB", "FB_Main", "Project/PLC/Blocks/FB_Main", 2, new Dictionary<string, string>
                 {
                     ["Calls"] = "FC_Helper, DB_Config",
-                    ["Uses"] = "UDT_Motor"
+                    ["Uses"] = "UDT_Motor",
+                    ["TagUsage"] = "Tag_Start, Tag_Stop"
                 }),
                 new TiaProjectObjectNode("FC", "FC_Helper", "Project/PLC/Blocks/FC_Helper", 2),
-                new TiaProjectObjectNode("DB", "DB_Config", "Project/PLC/Blocks/DB_Config", 2)
+                new TiaProjectObjectNode("DB", "DB_Config", "Project/PLC/Blocks/DB_Config", 2),
+                new TiaProjectObjectNode("Tag", "Tag_Start", "Project/PLC/Tags/Tag_Start", 2)
             ],
             Issues: Array.Empty<ExportIssue>()));
 
@@ -42,7 +44,16 @@ public sealed class DependencyGraphStageTests
         using var json = JsonDocument.Parse(artifact.Content);
 
         Assert.Equal("Partial", json.RootElement.GetProperty("status").GetString());
-        Assert.True(json.RootElement.GetProperty("summary").GetProperty("edgeCount").GetInt32() >= 3);
+        Assert.True(json.RootElement.GetProperty("summary").GetProperty("edgeCount").GetInt32() >= 5);
+        Assert.True(json.RootElement.GetProperty("summary").GetProperty("resolvedEdges").GetInt32() >= 3);
+        Assert.True(json.RootElement.GetProperty("summary").GetProperty("unresolvedEdges").GetInt32() >= 1);
+
+        var edges = json.RootElement.GetProperty("edges").EnumerateArray().ToArray();
+        Assert.Contains(edges, edge => edge.GetProperty("relationship").GetString() == "Calls");
+        Assert.Contains(edges, edge => edge.GetProperty("relationship").GetString() == "UsesTag");
+
+        var unresolvedTargets = json.RootElement.GetProperty("summary").GetProperty("topUnresolvedTargets").EnumerateArray().ToArray();
+        Assert.Contains(unresolvedTargets, target => target.GetProperty("target").GetString() == "UDT_Motor");
     }
 
     private sealed class RecordingArtifactWriter : IExportArtifactWriter

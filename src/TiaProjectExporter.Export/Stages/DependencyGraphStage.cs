@@ -11,7 +11,19 @@ namespace TiaProjectExporter.Export.Stages;
 /// </summary>
 public sealed class DependencyGraphStage : IExportStage
 {
-    private static readonly string[] DependencyMetadataKeys = ["Calls", "DependsOn", "Uses", "References", "Dependencies"];
+    private static readonly IReadOnlyDictionary<string, string> RelationshipByMetadataKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Calls"] = "Calls",
+        ["BlockCalls"] = "Calls",
+        ["InvokedBlocks"] = "Calls",
+        ["DependsOn"] = "DependsOn",
+        ["Dependencies"] = "DependsOn",
+        ["Uses"] = "Uses",
+        ["UsesType"] = "Uses",
+        ["References"] = "References",
+        ["ReferencedTags"] = "UsesTag",
+        ["TagUsage"] = "UsesTag"
+    };
 
     /// <inheritdoc />
     public string Name => "Dependency Graph";
@@ -69,15 +81,25 @@ public sealed class DependencyGraphStage : IExportStage
             .OrderBy(node => node.Id, StringComparer.Ordinal)
             .ToArray();
 
+        var nodeIds = nodes
+            .Select(node => node.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var nodeNames = nodes
+            .Select(node => node.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var edges = inventory.Objects
-            .SelectMany(source => ParseDependencies(source.Metadata).Select(target => new
+            .SelectMany(source => ParseDependencies(source.Metadata).Select(relation => new
             {
                 SourceId = BuildNodeId(source),
                 SourceName = source.Name,
-                Target = target,
-                Relationship = "DependsOn"
+                Target = relation.Target,
+                Relationship = relation.Relationship,
+                relation.MetadataKey,
+                Resolved = IsResolvedTarget(relation.Target, nodeIds, nodeNames)
             }))
-            .Distinct()
+            .DistinctBy(edge => $"{edge.SourceId}|{edge.Target}|{edge.Relationship}")
             .OrderBy(edge => edge.SourceId, StringComparer.Ordinal)
             .ThenBy(edge => edge.Target, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -88,6 +110,22 @@ public sealed class DependencyGraphStage : IExportStage
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
             .Take(20)
             .Select(group => new { Name = group.Key, Count = group.Count() })
+            .ToArray();
+
+        var relationships = edges
+            .GroupBy(edge => edge.Relationship)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new { Relationship = group.Key, Count = group.Count() })
+            .ToArray();
+
+        var unresolved = edges
+            .Where(edge => !edge.Resolved)
+            .GroupBy(edge => edge.Target)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Take(40)
+            .Select(group => new { Target = group.Key, Count = group.Count() })
             .ToArray();
 
         return new
@@ -101,7 +139,11 @@ public sealed class DependencyGraphStage : IExportStage
             {
                 NodeCount = nodes.Length,
                 EdgeCount = edges.Length,
-                TopDependents = topDependents
+                ResolvedEdges = edges.Count(edge => edge.Resolved),
+                UnresolvedEdges = edges.Count(edge => !edge.Resolved),
+                TopDependents = topDependents,
+                Relationships = relationships,
+                TopUnresolvedTargets = unresolved
             }
         };
     }
@@ -112,18 +154,28 @@ public sealed class DependencyGraphStage : IExportStage
         return seed.Trim().Replace(' ', '_');
     }
 
-    private static IReadOnlyCollection<string> ParseDependencies(IReadOnlyDictionary<string, string>? metadata)
+    private static IReadOnlyCollection<DependencyRelation> ParseDependencies(IReadOnlyDictionary<string, string>? metadata)
     {
         if (metadata is null)
         {
-            return Array.Empty<string>();
+            return Array.Empty<DependencyRelation>();
         }
 
-        return DependencyMetadataKeys
-            .Where(metadata.ContainsKey)
-            .SelectMany(key => SplitDependencies(metadata[key]))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        return RelationshipByMetadataKey
+            .Where(entry => metadata.ContainsKey(entry.Key))
+            .SelectMany(entry => SplitDependencies(metadata[entry.Key]).Select(target => new DependencyRelation(target, entry.Value, entry.Key)))
+            .DistinctBy(relation => $"{relation.Target}|{relation.Relationship}", StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static bool IsResolvedTarget(string target, IReadOnlySet<string> nodeIds, IReadOnlySet<string> nodeNames)
+    {
+        if (nodeIds.Contains(target) || nodeNames.Contains(target))
+        {
+            return true;
+        }
+
+        return nodeIds.Any(nodeId => nodeId.EndsWith($"/{target}", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IEnumerable<string> SplitDependencies(string raw)
@@ -134,4 +186,6 @@ public sealed class DependencyGraphStage : IExportStage
             .Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(token => !string.IsNullOrWhiteSpace(token));
     }
+
+    private sealed record DependencyRelation(string Target, string Relationship, string MetadataKey);
 }

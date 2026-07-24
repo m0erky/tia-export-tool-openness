@@ -123,6 +123,9 @@ Scope:
 - Added explicit `InstanceDB` classification in PLC block extraction for runtime type names containing instance DB markers.
 - Enriched PLC tag/tag-table extraction metadata with `DataType`, `Address`, `InitialValue`, `TagUsage`, `TagCount`, and table-level dependency capture.
 - Added unit tests for PLC block/tag extraction behavior, including OB relationship metadata, InstanceDB classification, and tag-table metadata extraction.
+- Upgraded `BLOCK_CALL_GRAPH.md` generation with entry-point detection, resolved vs unresolved call-edge classification, dashed Mermaid links for unresolved targets, and summary sections for hotspots.
+- Upgraded `DEPENDENCIES.json` generation with relationship-aware edges (`Calls`, `DependsOn`, `Uses`, `UsesTag`, `References`), metadata-key provenance, resolved/unresolved edge tracking, and unresolved-target summaries.
+- Extended graph-stage tests to verify unresolved target handling, relationship typing, and enriched graph/report sections.
 
 ## Known Issues
 
@@ -149,6 +152,7 @@ Scope:
 - Fallback hotspot analytics are currently reflection-metadata based and still require cross-validation against real Siemens API type catalogs on V18/V19/V20.
 - Function-block call graph, dependency graph, and unused-object detection are still pending and currently represented by placeholder/limited reports.
 - PLC extractor relationship metadata currently uses reflection heuristics/property-name conventions and still needs validation against concrete Siemens Openness block source/reference APIs.
+- Dependency and call graph resolution currently matches targets by names/paths heuristically and still needs direct Siemens identifier linking for full accuracy at scale.
 
 ## Future Improvements
 
