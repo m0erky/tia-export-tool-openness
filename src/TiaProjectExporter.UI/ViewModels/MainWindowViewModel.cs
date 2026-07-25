@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Application.Services;
@@ -42,6 +43,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _tiaInstallationValidationText = "Manual TIA installation override is optional.";
     private bool _isExporting;
     private CancellationTokenSource? _exportCancellationTokenSource;
+
+    private static readonly string AppVersion = ResolveAppVersion();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainWindowViewModel"/> class.
@@ -160,6 +163,16 @@ public sealed class MainWindowViewModel : ObservableObject
             }
         }
     }
+
+    /// <summary>
+    /// Gets the window title with the current app version.
+    /// </summary>
+    public string WindowTitle => $"TIA Project Exporter v{AppVersion}";
+
+    /// <summary>
+    /// Gets the display-friendly application version.
+    /// </summary>
+    public string VersionText => $"Version {AppVersion}";
 
     /// <summary>
     /// Gets or sets the validation feedback for the selected project path.
@@ -689,6 +702,29 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         return (true, $"Valid project path: {candidate}");
+    }
+
+    private static string ResolveAppVersion()
+    {
+        var informationalVersion = Assembly.GetEntryAssembly()?
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            var plusIndex = informationalVersion.IndexOf('+');
+            return plusIndex > 0
+                ? informationalVersion[..plusIndex]
+                : informationalVersion;
+        }
+
+        var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
+        if (assemblyVersion is null)
+        {
+            return "0.0.1";
+        }
+
+        return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
     }
 
     private void OnLogEntryAdded(object? sender, string entry)

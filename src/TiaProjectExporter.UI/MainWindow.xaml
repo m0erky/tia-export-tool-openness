@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="TIA Project Exporter"
+        Title="{Binding WindowTitle}"
         Width="1280"
         Height="820"
         MinWidth="980"
@@ -27,6 +27,9 @@
                                FontWeight="SemiBold"
                                Foreground="White"
                                Text="TIA Project Exporter" />
+                    <TextBlock Margin="0,2,0,0"
+                               Foreground="#B7E4C7"
+                               Text="{Binding VersionText}" />
                     <TextBlock Margin="0,6,0,0"
                                Foreground="#D8F3DC"
                                Text="AI-friendly Siemens TIA Portal project export for Git, VS Code, and LLM workflows." />

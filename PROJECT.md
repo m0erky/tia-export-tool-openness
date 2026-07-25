@@ -36,6 +36,8 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
+Version baseline for this milestone: **0.0.1**
+
 Scope:
 
 - Define TIA project traversal contracts that isolate Siemens Openness objects from the rest of the system.
@@ -186,6 +188,8 @@ Scope:
 - Added test coverage for the root-only+issue inventory classification case.
 - Updated partial-inventory unit fixture to include root + device objects so it remains classified as `Partial` under the new root-only failure heuristic.
 - Updated the corresponding assertion in partial-inventory unit tests to expect two objects (root + device) after fixture expansion.
+- Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
+- Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
 ## Known Issues
 
@@ -232,6 +236,7 @@ Scope:
 - Plugin-based exporters for object-type-specific enrichments.
 - Differential export mode for comparing current and previous project snapshots.
 - Native call graph and dependency graph generation from block references.
+- Automate patch-version incrementing in CI/release workflow to enforce per-commit version progression.
 
 ## Build Instructions
 
