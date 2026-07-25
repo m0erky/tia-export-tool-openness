@@ -9,6 +9,7 @@ using TiaProjectExporter.Infrastructure;
 using TiaProjectExporter.Tia;
 using TiaProjectExporter.UI.Configuration;
 using TiaProjectExporter.UI.Logging;
+using TiaProjectExporter.UI.Services;
 using TiaProjectExporter.UI.ViewModels;
 
 namespace TiaProjectExporter.UI;
@@ -39,6 +40,7 @@ public partial class App : System.Windows.Application
 
                 services.AddSingleton(exporterSettings);
                 services.AddSingleton<IExporterSettingsStore, JsonExporterSettingsStore>();
+                services.AddSingleton<IFolderSelectionService, WindowsFolderSelectionService>();
                 services.AddApplicationServices();
                 services.AddInfrastructure();
                 services.AddTiaServices();

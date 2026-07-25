@@ -12,16 +12,6 @@ namespace TiaProjectExporter.Tia.Inventory;
 /// </summary>
 public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAdapter
 {
-    private static readonly IReadOnlyList<string> AssemblyCandidateDirectories =
-    [
-        string.Empty,
-        "Bin",
-        "PublicAPI",
-        "PublicAPI\\V18",
-        "PublicAPI\\V19",
-        "PublicAPI\\V20"
-    ];
-
     private readonly ITiaInstallationDiscoveryService _installationDiscoveryService;
     private readonly IReadOnlyList<ITiaDomainExtractor> _domainExtractors;
     private readonly ILogger<ReflectionTiaProjectOpennessAdapter> _logger;
@@ -89,7 +79,7 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
                 Issues: issues);
         }
 
-        var assemblyPath = ResolveEngineeringAssemblyPath(preferredInstallation.InstallPath!);
+        var assemblyPath = OpennessRuntimeLocator.ResolveEngineeringAssemblyPath(preferredInstallation.InstallPath!);
 
         if (assemblyPath is null)
         {
@@ -587,20 +577,4 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
         }
     }
 
-    private static string? ResolveEngineeringAssemblyPath(string installPath)
-    {
-        foreach (var candidateDirectory in AssemblyCandidateDirectories)
-        {
-            var candidatePath = string.IsNullOrWhiteSpace(candidateDirectory)
-                ? Path.Combine(installPath, "Siemens.Engineering.dll")
-                : Path.Combine(installPath, candidateDirectory, "Siemens.Engineering.dll");
-
-            if (File.Exists(candidatePath))
-            {
-                return candidatePath;
-            }
-        }
-
-        return null;
-    }
 }

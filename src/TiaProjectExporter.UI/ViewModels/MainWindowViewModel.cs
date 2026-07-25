@@ -3,8 +3,10 @@ using System.Windows;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Application.Services;
 using TiaProjectExporter.Core.Models;
+using TiaProjectExporter.Tia.Inventory;
 using TiaProjectExporter.UI.Configuration;
 using TiaProjectExporter.UI.Logging;
+using TiaProjectExporter.UI.Services;
 
 namespace TiaProjectExporter.UI.ViewModels;
 
@@ -17,6 +19,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly ITiaInstallationDiscoveryService _installationDiscoveryService;
     private readonly ExportCoordinator _exportCoordinator;
     private readonly IExporterSettingsStore _settingsStore;
+    private readonly IFolderSelectionService _folderSelectionService;
     private readonly UiLogCollector _logCollector;
     private string _projectPath = string.Empty;
     private string _tiaInstallationPathOverride = string.Empty;
@@ -34,6 +37,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private int _succeededCount;
     private int _failedCount;
     private int _issueCount;
+    private string _tiaInstallationValidationText = "Manual TIA installation override is optional.";
     private bool _isExporting;
     private CancellationTokenSource? _exportCancellationTokenSource;
 
@@ -45,11 +49,13 @@ public sealed class MainWindowViewModel : ObservableObject
         ExportCoordinator exportCoordinator,
         ExporterSettings settings,
         IExporterSettingsStore settingsStore,
+        IFolderSelectionService folderSelectionService,
         UiLogCollector logCollector)
     {
         _installationDiscoveryService = installationDiscoveryService;
         _exportCoordinator = exportCoordinator;
         _settingsStore = settingsStore;
+        _folderSelectionService = folderSelectionService;
         _logCollector = logCollector;
 
         _outputDirectory = settings.DefaultOutputDirectory;
@@ -58,6 +64,8 @@ public sealed class MainWindowViewModel : ObservableObject
         _skipDiagnostics = settings.SkipDiagnostics;
 
         DiscoverVersionsCommand = new AsyncRelayCommand(DiscoverVersionsAsync, onExceptionAsync: HandleCommandExceptionAsync);
+        BrowseTiaInstallationPathOverrideCommand = new AsyncRelayCommand(BrowseTiaInstallationPathOverrideAsync, onExceptionAsync: HandleCommandExceptionAsync);
+        ValidateTiaInstallationPathOverrideCommand = new AsyncRelayCommand(ValidateTiaInstallationPathOverrideAsync, onExceptionAsync: HandleCommandExceptionAsync);
         ExportCommand = new AsyncRelayCommand(ExportAsync, CanExport, HandleCommandExceptionAsync);
         CancelExportCommand = new AsyncRelayCommand(CancelExportAsync, CanCancelExport, HandleCommandExceptionAsync);
 
@@ -85,6 +93,16 @@ public sealed class MainWindowViewModel : ObservableObject
     /// Gets the command that detects installed TIA versions.
     /// </summary>
     public AsyncRelayCommand DiscoverVersionsCommand { get; }
+
+    /// <summary>
+    /// Gets the command that opens a folder picker for the manual TIA installation path override.
+    /// </summary>
+    public AsyncRelayCommand BrowseTiaInstallationPathOverrideCommand { get; }
+
+    /// <summary>
+    /// Gets the command that validates the manual TIA installation path override.
+    /// </summary>
+    public AsyncRelayCommand ValidateTiaInstallationPathOverrideCommand { get; }
 
     /// <summary>
     /// Gets the command that starts the export.
@@ -126,7 +144,24 @@ public sealed class MainWindowViewModel : ObservableObject
     public string TiaInstallationPathOverride
     {
         get => _tiaInstallationPathOverride;
-        set => SetProperty(ref _tiaInstallationPathOverride, value);
+        set
+        {
+            if (SetProperty(ref _tiaInstallationPathOverride, value))
+            {
+                TiaInstallationValidationText = string.IsNullOrWhiteSpace(value)
+                    ? "Manual TIA installation override is optional."
+                    : "Path changed. Click 'Validate Path' to verify TIA V20 + Openness runtime.";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the validation feedback for the manual TIA installation override path.
+    /// </summary>
+    public string TiaInstallationValidationText
+    {
+        get => _tiaInstallationValidationText;
+        set => SetProperty(ref _tiaInstallationValidationText, value);
     }
 
     /// <summary>
@@ -285,6 +320,60 @@ public sealed class MainWindowViewModel : ObservableObject
         StatusText = installations.Count == 0
             ? "No supported TIA versions detected"
             : $"Detected {installations.Count} supported TIA version(s)";
+    }
+
+    private Task BrowseTiaInstallationPathOverrideAsync()
+    {
+        var selectedPath = _folderSelectionService.PickFolder(TiaInstallationPathOverride);
+
+        if (!string.IsNullOrWhiteSpace(selectedPath))
+        {
+            TiaInstallationPathOverride = selectedPath;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ValidateTiaInstallationPathOverrideAsync()
+    {
+        var candidatePath = TiaInstallationPathOverride?.Trim();
+
+        if (string.IsNullOrWhiteSpace(candidatePath))
+        {
+            TiaInstallationValidationText = "No override path set. Detection will use discovered installations.";
+            return Task.CompletedTask;
+        }
+
+        if (!Directory.Exists(candidatePath))
+        {
+            TiaInstallationValidationText = "Invalid path: directory does not exist.";
+            return Task.CompletedTask;
+        }
+
+        var isV20Path = OpennessRuntimeLocator.IsLikelyV20InstallationPath(candidatePath);
+        var engineeringAssemblyPath = OpennessRuntimeLocator.ResolveEngineeringAssemblyPath(candidatePath);
+        var opennessDetected = !string.IsNullOrWhiteSpace(engineeringAssemblyPath);
+
+        if (isV20Path && opennessDetected)
+        {
+            TiaInstallationValidationText = $"Valid: TIA V20 + Openness found ({engineeringAssemblyPath}).";
+            return Task.CompletedTask;
+        }
+
+        if (!isV20Path && opennessDetected)
+        {
+            TiaInstallationValidationText = "Openness runtime was found, but this does not look like a TIA V20 installation path.";
+            return Task.CompletedTask;
+        }
+
+        if (isV20Path)
+        {
+            TiaInstallationValidationText = "TIA V20 path detected, but Siemens.Engineering.dll was not found (Openness missing).";
+            return Task.CompletedTask;
+        }
+
+        TiaInstallationValidationText = "Path does not look like TIA V20 and Openness runtime was not found.";
+        return Task.CompletedTask;
     }
 
     private async Task ExportAsync()
