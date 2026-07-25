@@ -185,6 +185,7 @@ Scope:
 - Updated inventory status heuristics so "root-only object + traversal issues" is classified as `Unavailable` rather than `Partial`.
 - Added test coverage for the root-only+issue inventory classification case.
 - Updated partial-inventory unit fixture to include root + device objects so it remains classified as `Partial` under the new root-only failure heuristic.
+- Updated the corresponding assertion in partial-inventory unit tests to expect two objects (root + device) after fixture expansion.
 
 ## Known Issues
 

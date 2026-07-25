@@ -39,7 +39,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
         var inventory = await provider.BuildInventoryAsync("C:/Projects/Sample.ap18", null, CancellationToken.None);
 
         Assert.Equal(TiaInventoryStatus.Partial, inventory.Status);
-        Assert.Single(inventory.Objects);
+        Assert.Equal(2, inventory.Objects.Count);
         Assert.Single(inventory.Issues);
     }
 
