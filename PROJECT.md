@@ -171,6 +171,7 @@ Scope:
 - Added WPF folder browsing and explicit `Validate Path` flow for manual TIA override selection.
 - Added V20+Openness override validation feedback in UI based on V20 path heuristics and `Siemens.Engineering.dll` discovery.
 - Extracted shared Openness runtime assembly path resolution into `OpennessRuntimeLocator` and reused it in adapter/UI validation.
+- Fixed `OpennessRuntimeLocator` candidate path handling to be OS-agnostic (segment-based) so `PublicAPI/V20` discovery works reliably in tests and mixed path separator environments.
 
 ## Known Issues
 

@@ -5,14 +5,14 @@ namespace TiaProjectExporter.Tia.Inventory;
 /// </summary>
 public static class OpennessRuntimeLocator
 {
-    private static readonly IReadOnlyList<string> AssemblyCandidateDirectories =
+    private static readonly IReadOnlyList<string[]> AssemblyCandidateDirectorySegments =
     [
-        string.Empty,
-        "Bin",
-        "PublicAPI",
-        "PublicAPI\\V18",
-        "PublicAPI\\V19",
-        "PublicAPI\\V20"
+        [],
+        ["Bin"],
+        ["PublicAPI"],
+        ["PublicAPI", "V18"],
+        ["PublicAPI", "V19"],
+        ["PublicAPI", "V20"]
     ];
 
     /// <summary>
@@ -25,11 +25,11 @@ public static class OpennessRuntimeLocator
             return null;
         }
 
-        foreach (var candidateDirectory in AssemblyCandidateDirectories)
+        foreach (var segments in AssemblyCandidateDirectorySegments)
         {
-            var candidatePath = string.IsNullOrWhiteSpace(candidateDirectory)
+            var candidatePath = segments.Length == 0
                 ? Path.Combine(installPath, "Siemens.Engineering.dll")
-                : Path.Combine(installPath, candidateDirectory, "Siemens.Engineering.dll");
+                : Path.Combine([installPath, ..segments, "Siemens.Engineering.dll"]);
 
             if (File.Exists(candidatePath))
             {
