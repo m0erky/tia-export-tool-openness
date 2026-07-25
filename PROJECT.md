@@ -179,7 +179,6 @@ Scope:
 - WPF cancellation behavior is implemented but still requires Windows runtime validation against real long-running export stages.
 - Recent output folder history behavior still needs UX validation on Windows for long path editing and combobox interaction.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
-- Manual installation override is currently a text field; browse dialog and path validation UX are not implemented yet.
 - Manual override V20 path detection is heuristic (`V20`/`PublicAPI/V20`) and should be cross-validated against broader enterprise install layouts.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
