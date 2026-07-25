@@ -10,6 +10,5 @@ public interface ITiaProjectInventoryProvider
     /// <summary>
     /// Builds a project inventory for the supplied project path.
     /// </summary>
-    Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, CancellationToken cancellationToken);
+    Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken);
 }
-

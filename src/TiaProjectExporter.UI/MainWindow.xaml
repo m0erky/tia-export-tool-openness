@@ -73,6 +73,11 @@
                               ItemsSource="{Binding RecentOutputDirectories}"
                               Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" />
 
+                    <TextBlock Margin="0,16,0,4"
+                               Text="TIA Installation Path Override (optional)" />
+                    <TextBox ToolTip="Set only when automatic detection fails. Use the TIA root directory containing Siemens.Engineering.dll."
+                             Text="{Binding TiaInstallationPathOverride, UpdateSourceTrigger=PropertyChanged}" />
+
                     <TextBlock Margin="0,16,0,6"
                                Text="Formats" />
                     <WrapPanel>

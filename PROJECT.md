@@ -51,6 +51,7 @@ Scope:
 - Validate/extend PLC extractor mappings for instance DBs, block language metadata, and tag-table semantics against real TIA V18/V19/V20 runtime objects.
 - Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
 - Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
+- Add a browse-dialog UX for selecting the manual TIA installation override path in the WPF UI.
 
 ## Completed Tasks
 
@@ -164,6 +165,9 @@ Scope:
 - Hardened Windows TIA installation discovery for V18/V19/V20 by probing multiple Siemens registry key layouts, user/machine hives, and uninstall entries, plus recursive Siemens tree fallback probing.
 - Added README troubleshooting guidance for Windows installations not being detected.
 - Refined discovery filters to reject non-product uninstall matches (for example `TIA Portal Help Viewer`) and prefer likely real portal installations with Openness indicators.
+- Added optional manual installation override plumbing (`TiaInstallationPathOverride`) across UI options, export options, inventory provider, and Openness adapter contracts.
+- Extended the WPF settings panel and persisted user settings with `TIA Installation Path Override (optional)` so users can export even when registry discovery misses custom installs.
+- Added/updated test coverage for new override-aware signatures and adapter forwarding behavior.
 
 ## Known Issues
 
@@ -172,6 +176,7 @@ Scope:
 - WPF cancellation behavior is implemented but still requires Windows runtime validation against real long-running export stages.
 - Recent output folder history behavior still needs UX validation on Windows for long path editing and combobox interaction.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
+- Manual installation override is currently a text field; browse dialog and path validation UX are not implemented yet.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.

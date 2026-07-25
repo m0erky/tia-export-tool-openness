@@ -44,7 +44,7 @@ public sealed class ProjectInventoryStageTests
             _inventory = inventory;
         }
 
-        public Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, CancellationToken cancellationToken) =>
+        public Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken) =>
             Task.FromResult(_inventory);
     }
 

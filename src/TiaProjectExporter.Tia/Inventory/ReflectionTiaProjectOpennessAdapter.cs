@@ -40,7 +40,7 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
     }
 
     /// <inheritdoc />
-    public async Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, CancellationToken cancellationToken)
+    public async Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -73,17 +73,14 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
         }
 
         var installations = await _installationDiscoveryService.DiscoverAsync(cancellationToken).ConfigureAwait(false);
-        var preferredInstallation = installations
-            .Where(installation => installation.OpennessAvailable && !string.IsNullOrWhiteSpace(installation.InstallPath))
-            .OrderByDescending(installation => installation.Version)
-            .FirstOrDefault();
+        var preferredInstallation = ResolvePreferredInstallation(installations, tiaInstallationPathOverride);
 
         if (preferredInstallation is null)
         {
             issues.Add(new ExportIssue(
                 "OpennessRuntime",
                 "No supported TIA installation with Openness runtime metadata was detected.",
-                "Install TIA Portal V18, V19, or V20 and verify Openness components are present."));
+                "Install TIA Portal V18, V19, or V20 and verify Openness components are present. You can also set a manual installation path override in the UI."));
 
             return new TiaProjectTraversalResult(
                 ProjectName: Path.GetFileNameWithoutExtension(projectPath),
@@ -121,6 +118,44 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
             ProjectPath: projectPath,
             Objects: objects,
             Issues: issues);
+    }
+
+    private static DiscoveredTiaPortalInstallation? ResolvePreferredInstallation(
+        IReadOnlyList<DiscoveredTiaPortalInstallation> discoveredInstallations,
+        string? tiaInstallationPathOverride)
+    {
+        if (!string.IsNullOrWhiteSpace(tiaInstallationPathOverride))
+        {
+            var normalized = tiaInstallationPathOverride.Trim().Trim('"');
+            var inferredVersion = InferVersionFromPath(normalized);
+            return new DiscoveredTiaPortalInstallation(
+                inferredVersion,
+                $"Manual TIA Override ({inferredVersion})",
+                normalized,
+                OpennessAvailable: true);
+        }
+
+        return discoveredInstallations
+            .Where(installation => installation.OpennessAvailable && !string.IsNullOrWhiteSpace(installation.InstallPath))
+            .OrderByDescending(installation => installation.Version)
+            .FirstOrDefault();
+    }
+
+    private static TiaPortalVersion InferVersionFromPath(string installPath)
+    {
+        if (installPath.Contains("V18", StringComparison.OrdinalIgnoreCase)
+            || installPath.Contains("Portal V18", StringComparison.OrdinalIgnoreCase))
+        {
+            return TiaPortalVersion.V18;
+        }
+
+        if (installPath.Contains("V19", StringComparison.OrdinalIgnoreCase)
+            || installPath.Contains("Portal V19", StringComparison.OrdinalIgnoreCase))
+        {
+            return TiaPortalVersion.V19;
+        }
+
+        return TiaPortalVersion.V20;
     }
 
     private void ProbeRuntimeAndTraverseProject(

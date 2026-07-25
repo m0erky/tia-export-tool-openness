@@ -19,7 +19,7 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
     }
 
     /// <inheritdoc />
-    public async Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, CancellationToken cancellationToken)
+    public async Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -43,7 +43,7 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
 
         try
         {
-            traversal = await _opennessAdapter.TraverseAsync(projectPath, cancellationToken).ConfigureAwait(false);
+            traversal = await _opennessAdapter.TraverseAsync(projectPath, tiaInstallationPathOverride, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

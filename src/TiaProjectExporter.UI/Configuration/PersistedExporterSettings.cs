@@ -16,6 +16,11 @@ public sealed class PersistedExporterSettings
     public string? LastOutputDirectory { get; set; }
 
     /// <summary>
+    /// Gets or sets the optional manual TIA installation path override.
+    /// </summary>
+    public string? TiaInstallationPathOverride { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether JSON export is selected.
     /// </summary>
     public bool ExportJson { get; set; } = true;

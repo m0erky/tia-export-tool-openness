@@ -21,7 +21,29 @@ public sealed class ReflectionTiaProjectOpennessAdapterTests
             Array.Empty<ITiaDomainExtractor>(),
             NullLogger<ReflectionTiaProjectOpennessAdapter>.Instance);
 
-        var result = await adapter.TraverseAsync("/tmp/sample.ap18", CancellationToken.None);
+        var result = await adapter.TraverseAsync("/tmp/sample.ap18", null, CancellationToken.None);
+
+        Assert.NotEmpty(result.Objects);
+        Assert.Contains(result.Issues, issue => issue.Scope == "OpennessRuntime");
+    }
+
+    [Fact]
+    public async Task TraverseAsync_AllowsManualOverride_OnNonWindowsHostsWithoutThrowing()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var adapter = new ReflectionTiaProjectOpennessAdapter(
+            new StubDiscoveryService(Array.Empty<DiscoveredTiaPortalInstallation>()),
+            Array.Empty<ITiaDomainExtractor>(),
+            NullLogger<ReflectionTiaProjectOpennessAdapter>.Instance);
+
+        var result = await adapter.TraverseAsync(
+            "/tmp/sample.ap20",
+            @"C:\Program Files\Siemens\Automation\Portal V20",
+            CancellationToken.None);
 
         Assert.NotEmpty(result.Objects);
         Assert.Contains(result.Issues, issue => issue.Scope == "OpennessRuntime");

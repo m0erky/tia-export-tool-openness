@@ -19,6 +19,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IExporterSettingsStore _settingsStore;
     private readonly UiLogCollector _logCollector;
     private string _projectPath = string.Empty;
+    private string _tiaInstallationPathOverride = string.Empty;
     private string _outputDirectory;
     private bool _exportJson = true;
     private bool _exportXml = true;
@@ -117,6 +118,15 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         get => _projectPath;
         set => SetProperty(ref _projectPath, value);
+    }
+
+    /// <summary>
+    /// Gets or sets an optional manual override path for TIA installation root.
+    /// </summary>
+    public string TiaInstallationPathOverride
+    {
+        get => _tiaInstallationPathOverride;
+        set => SetProperty(ref _tiaInstallationPathOverride, value);
     }
 
     /// <summary>
@@ -300,7 +310,8 @@ public sealed class MainWindowViewModel : ObservableObject
                 BuildFormats(),
                 EnableCompression,
                 SkipDiagnostics,
-                ExportMarkdown);
+                ExportMarkdown,
+                string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim());
 
             var report = await _exportCoordinator.ExecuteAsync(options, HandleProgressAsync, cancellationTokenSource.Token);
 
@@ -369,6 +380,10 @@ public sealed class MainWindowViewModel : ObservableObject
             ? ProjectPath
             : persisted.LastProjectPath;
 
+        TiaInstallationPathOverride = string.IsNullOrWhiteSpace(persisted.TiaInstallationPathOverride)
+            ? TiaInstallationPathOverride
+            : persisted.TiaInstallationPathOverride;
+
         OutputDirectory = string.IsNullOrWhiteSpace(persisted.LastOutputDirectory)
             ? OutputDirectory
             : persisted.LastOutputDirectory;
@@ -390,6 +405,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var persisted = new PersistedExporterSettings
         {
             LastProjectPath = ProjectPath,
+            TiaInstallationPathOverride = TiaInstallationPathOverride,
             LastOutputDirectory = OutputDirectory,
             ExportJson = ExportJson,
             ExportXml = ExportXml,

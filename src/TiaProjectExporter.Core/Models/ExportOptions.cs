@@ -9,7 +9,8 @@ public sealed record ExportOptions(
     IReadOnlyCollection<ExportFormat> Formats,
     bool EnableCompression,
     bool SkipDiagnostics,
-    bool GenerateMarkdownSummaries)
+    bool GenerateMarkdownSummaries,
+    string? TiaInstallationPathOverride = null)
 {
     /// <summary>
     /// Creates default options for an export session.
@@ -21,5 +22,6 @@ public sealed record ExportOptions(
             Formats: new[] { ExportFormat.Json, ExportFormat.Xml, ExportFormat.Markdown },
             EnableCompression: false,
             SkipDiagnostics: false,
-            GenerateMarkdownSummaries: true);
+            GenerateMarkdownSummaries: true,
+            TiaInstallationPathOverride: null);
 }

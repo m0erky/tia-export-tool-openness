@@ -98,6 +98,7 @@ Windows validation workflow artifacts:
 3. Enter/select:
    - **Project Path**: source TIA project
    - **Output Directory**: export destination
+   - **TIA Installation Path Override (optional)**: manual TIA root path (for example `C:\Program Files\Siemens\Automation\Portal V20`) when auto detection fails
 4. Choose options:
    - formats (`JSON`, `XML`, `Markdown`)
    - `Enable Compression`
@@ -195,6 +196,7 @@ Current keys:
   - Verify TIA Portal and Openness are installed for that machine/user.
   - Re-run **Detect Versions** after installing or repairing TIA components.
   - The discovery logic now probes multiple Siemens registry layouts and uninstall entries for V18/V19/V20, and excludes non-product matches (for example `TIA Portal Help Viewer`).
+  - If detection still fails in your environment, set **TIA Installation Path Override (optional)** to the TIA installation root that contains Siemens public API folders/assemblies.
   - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note
