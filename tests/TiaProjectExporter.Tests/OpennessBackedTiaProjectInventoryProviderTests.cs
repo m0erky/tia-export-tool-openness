@@ -43,6 +43,30 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     }
 
     [Fact]
+    public async Task BuildInventoryAsync_ReturnsUnavailable_WhenOnlyRootObjectExistsAndIssuesPresent()
+    {
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _) =>
+            Task.FromResult(
+                new TiaProjectTraversalResult(
+                    ProjectName: "Sample",
+                    ProjectPath: projectPath,
+                    Objects: new[]
+                    {
+                        new TiaProjectObjectNode("Project", "Sample", "Project", 0)
+                    },
+                    Issues:
+                    [
+                        new ExportIssue("OpennessTraversal", "Traversal failed")
+                    ]))));
+
+        var inventory = await provider.BuildInventoryAsync("C:/Projects/Sample.ap20", null, CancellationToken.None);
+
+        Assert.Equal(TiaInventoryStatus.Unavailable, inventory.Status);
+        Assert.Single(inventory.Objects);
+        Assert.Single(inventory.Issues);
+    }
+
+    [Fact]
     public async Task BuildInventoryAsync_ReturnsUnavailable_WhenTraversalThrows()
     {
         var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _) => throw new InvalidOperationException("Boom")));

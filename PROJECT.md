@@ -181,6 +181,9 @@ Scope:
 - Added WPF app-level exception hardening (startup/exit guards and unhandled exception handlers) to reduce unexpected shutdowns.
 - Updated unit tests to assert failed inventory result behavior when inventory is unavailable.
 - Fixed Windows build ambiguity by fully qualifying WPF `MessageBox` and `Microsoft.Win32.OpenFileDialog` after enabling Windows Forms folder picker support.
+- Improved Openness traversal diagnostics by unwrapping nested reflection invocation exceptions into export issue details.
+- Updated inventory status heuristics so "root-only object + traversal issues" is classified as `Unavailable` rather than `Partial`.
+- Added test coverage for the root-only+issue inventory classification case.
 
 ## Known Issues
 

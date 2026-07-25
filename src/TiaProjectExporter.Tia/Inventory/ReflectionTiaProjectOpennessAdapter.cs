@@ -217,7 +217,7 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
             issues.Add(new ExportIssue(
                 "OpennessTraversal",
                 "Siemens Openness traversal failed.",
-                exception.Message));
+                DescribeException(exception)));
         }
         finally
         {
@@ -252,11 +252,15 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
             return null;
         }
 
-        var openMethod = projects.GetType()
+        var openMethods = projects.GetType()
             .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(method =>
+            .Where(method =>
                 method.Name == "Open" &&
-                method.GetParameters().Length == 1);
+                method.GetParameters().Length == 1)
+            .ToArray();
+
+        var openMethod = openMethods.FirstOrDefault(method => method.GetParameters()[0].ParameterType == typeof(FileInfo))
+            ?? openMethods.FirstOrDefault();
 
         if (openMethod is null)
         {
@@ -268,7 +272,33 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
             ? new FileInfo(projectPath)
             : projectPath;
 
-        return openMethod.Invoke(projects, [argument]);
+        try
+        {
+            return openMethod.Invoke(projects, [argument]);
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                $"Opening project failed for path '{projectPath}'. {DescribeException(exception)}",
+                exception);
+        }
+    }
+
+    private static string DescribeException(Exception exception)
+    {
+        var current = exception;
+        var segments = new List<string>();
+
+        while (current is not null)
+        {
+            var segment = string.IsNullOrWhiteSpace(current.Message)
+                ? current.GetType().Name
+                : $"{current.GetType().Name}: {current.Message}";
+            segments.Add(segment);
+            current = current.InnerException;
+        }
+
+        return string.Join(" | Inner: ", segments);
     }
 
     private void TraverseProjectRoot(

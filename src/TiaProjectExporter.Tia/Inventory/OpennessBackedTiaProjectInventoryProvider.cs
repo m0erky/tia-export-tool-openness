@@ -82,6 +82,11 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
             return TiaInventoryStatus.Unavailable;
         }
 
+        if (objectCount <= 1 && issueCount > 0)
+        {
+            return TiaInventoryStatus.Unavailable;
+        }
+
         if (issueCount > 0)
         {
             return TiaInventoryStatus.Partial;

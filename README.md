@@ -210,6 +210,7 @@ Current keys:
   - Click **Validate Project** and ensure project path points to an existing `.ap18`, `.ap19`, or `.ap20` project.
   - Check `Export/Reports/TIA_PROJECT_INVENTORY.md` and `Export/EXPORT_REPORT.md` for traversal issues.
   - If inventory status is `Unavailable` or `Partial`, the run is now reported as "completed with issues" instead of plain success.
+  - Openness traversal errors now include unwrapped inner exception details to make root-cause diagnosis (version mismatch, access mode, lock/session issues) easier.
   - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note
