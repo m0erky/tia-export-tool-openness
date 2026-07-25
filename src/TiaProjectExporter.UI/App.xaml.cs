@@ -73,11 +73,11 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            MessageBox.Show(
+            System.Windows.MessageBox.Show(
                 $"Application startup failed.\n\n{exception}",
                 "TIA Project Exporter",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
             Shutdown(-1);
         }
     }
@@ -111,11 +111,11 @@ public partial class App : System.Windows.Application
 
     private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        MessageBox.Show(
+        System.Windows.MessageBox.Show(
             $"Unexpected error:\n\n{e.Exception.Message}",
             "TIA Project Exporter",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+            System.Windows.MessageBoxButton.OK,
+            System.Windows.MessageBoxImage.Warning);
         e.Handled = true;
     }
 
@@ -123,11 +123,11 @@ public partial class App : System.Windows.Application
     {
         if (e.ExceptionObject is Exception exception)
         {
-            MessageBox.Show(
+            System.Windows.MessageBox.Show(
                 $"Unhandled application error:\n\n{exception.Message}",
                 "TIA Project Exporter",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
         }
     }
 

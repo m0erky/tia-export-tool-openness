@@ -180,6 +180,7 @@ Scope:
 - Changed inventory-stage result mapping so `TiaInventoryStatus.Unavailable` contributes a failed result instead of skipped.
 - Added WPF app-level exception hardening (startup/exit guards and unhandled exception handlers) to reduce unexpected shutdowns.
 - Updated unit tests to assert failed inventory result behavior when inventory is unavailable.
+- Fixed Windows build ambiguity by fully qualifying WPF `MessageBox` and `Microsoft.Win32.OpenFileDialog` after enabling Windows Forms folder picker support.
 
 ## Known Issues
 

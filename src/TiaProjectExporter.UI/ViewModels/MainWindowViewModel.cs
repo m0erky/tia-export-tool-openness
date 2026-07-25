@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
-using Microsoft.Win32;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Application.Services;
 using TiaProjectExporter.Core.Models;
@@ -357,7 +356,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private Task BrowseProjectPathAsync()
     {
-        var dialog = new OpenFileDialog
+        var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = "Select TIA Project File",
             Filter = "TIA Project (*.ap18;*.ap19;*.ap20)|*.ap18;*.ap19;*.ap20|All files (*.*)|*.*",
