@@ -28,6 +28,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
                     ProjectPath: projectPath,
                     Objects: new[]
                     {
+                        new TiaProjectObjectNode("Project", "Sample", "Project", 0),
                         new TiaProjectObjectNode("Device", "PLC_1", "Project/Devices/PLC_1", 1)
                     },
                     Issues:

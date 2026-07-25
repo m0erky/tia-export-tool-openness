@@ -184,6 +184,7 @@ Scope:
 - Improved Openness traversal diagnostics by unwrapping nested reflection invocation exceptions into export issue details.
 - Updated inventory status heuristics so "root-only object + traversal issues" is classified as `Unavailable` rather than `Partial`.
 - Added test coverage for the root-only+issue inventory classification case.
+- Updated partial-inventory unit fixture to include root + device objects so it remains classified as `Partial` under the new root-only failure heuristic.
 
 ## Known Issues
 
