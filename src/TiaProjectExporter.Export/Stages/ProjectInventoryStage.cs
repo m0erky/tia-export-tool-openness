@@ -74,7 +74,7 @@ public sealed class ProjectInventoryStage : IExportStage
         {
             TiaInventoryStatus.Complete => ExportObjectStatus.Succeeded,
             TiaInventoryStatus.Partial => ExportObjectStatus.Skipped,
-            _ => ExportObjectStatus.Skipped
+            _ => ExportObjectStatus.Failed
         };
 
         context.AddResult(new ExportedObjectResult("Inventory", inventory.ProjectName ?? "TIA project", status, inventory.Status.ToString()));

@@ -96,7 +96,9 @@ Windows validation workflow artifacts:
 1. Start `TiaProjectExporter.UI`.
 2. Click **Detect Versions** (optional but recommended).
 3. Enter/select:
-   - **Project Path**: source TIA project
+   - **Project Path**: source TIA project (`.ap18`, `.ap19`, `.ap20`)
+     - use **Browse** to pick the project file
+     - use **Validate Project** to verify path exists and extension is supported
    - **Output Directory**: export destination
    - **TIA Installation Path Override (optional)**: manual TIA root path (for example `C:\Program Files\Siemens\Automation\Portal V20`) when auto detection fails
      - use **Browse** to select the folder
@@ -113,6 +115,7 @@ Notes:
 
 - Output directory history and settings are persisted in user profile (`LocalApplicationData`).
 - Export can be canceled from the UI; cancellation is cooperative.
+- Export now requires a valid project path; if invalid, export does not start and validation feedback is shown in UI.
 
 ## Export output structure
 
@@ -202,6 +205,11 @@ Current keys:
   - A valid V20+Openness override requires:
     - path looks like TIA V20 (for example contains `V20` or has `PublicAPI/V20`)
     - `Siemens.Engineering.dll` is found in the installation root/public API candidates
+
+- **Export finishes but contains only standard files**
+  - Click **Validate Project** and ensure project path points to an existing `.ap18`, `.ap19`, or `.ap20` project.
+  - Check `Export/Reports/TIA_PROJECT_INVENTORY.md` and `Export/EXPORT_REPORT.md` for traversal issues.
+  - If inventory status is `Unavailable` or `Partial`, the run is now reported as "completed with issues" instead of plain success.
   - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note

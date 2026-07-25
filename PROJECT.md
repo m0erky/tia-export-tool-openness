@@ -52,6 +52,7 @@ Scope:
 - Validate WPF build and runtime behavior on a Windows machine with the .NET 8 SDK installed.
 - Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
 - Add optional auto-validation trigger when manual TIA override path changes (currently explicit Validate button).
+- Add folder-based project picker support for `.ap18/.ap19/.ap20` directory-style projects in addition to file picker.
 
 ## Completed Tasks
 
@@ -173,6 +174,12 @@ Scope:
 - Extracted shared Openness runtime assembly path resolution into `OpennessRuntimeLocator` and reused it in adapter/UI validation.
 - Fixed `OpennessRuntimeLocator` candidate path handling to be OS-agnostic (segment-based) so `PublicAPI/V20` discovery works reliably in tests and mixed path separator environments.
 - Fixed WPF build break in `MainWindowViewModel` by importing `System.IO` for `Directory` usage in manual override validation.
+- Added source project path UX improvements: `Browse` and `Validate Project` actions plus explicit UI validation feedback.
+- Hardened export start conditions to require valid existing `.ap18/.ap19/.ap20` project paths before running pipeline stages.
+- Updated UI export completion status logic to report "completed with issues" whenever issues are present, even with zero failed stages.
+- Changed inventory-stage result mapping so `TiaInventoryStatus.Unavailable` contributes a failed result instead of skipped.
+- Added WPF app-level exception hardening (startup/exit guards and unhandled exception handlers) to reduce unexpected shutdowns.
+- Updated unit tests to assert failed inventory result behavior when inventory is unavailable.
 
 ## Known Issues
 
@@ -182,6 +189,7 @@ Scope:
 - Recent output folder history behavior still needs UX validation on Windows for long path editing and combobox interaction.
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
 - Manual override V20 path detection is heuristic (`V20`/`PublicAPI/V20`) and should be cross-validated against broader enterprise install layouts.
+- Source project browse currently uses file picker workflow; directory-style `.apXX` project selection still relies on manual path input.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.

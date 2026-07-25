@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using Microsoft.Win32;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Application.Services;
 using TiaProjectExporter.Core.Models;
@@ -38,6 +39,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private int _succeededCount;
     private int _failedCount;
     private int _issueCount;
+    private string _projectPathValidationText = "Set a TIA project path (.ap18/.ap19/.ap20) before export.";
     private string _tiaInstallationValidationText = "Manual TIA installation override is optional.";
     private bool _isExporting;
     private CancellationTokenSource? _exportCancellationTokenSource;
@@ -65,6 +67,8 @@ public sealed class MainWindowViewModel : ObservableObject
         _skipDiagnostics = settings.SkipDiagnostics;
 
         DiscoverVersionsCommand = new AsyncRelayCommand(DiscoverVersionsAsync, onExceptionAsync: HandleCommandExceptionAsync);
+        BrowseProjectPathCommand = new AsyncRelayCommand(BrowseProjectPathAsync, onExceptionAsync: HandleCommandExceptionAsync);
+        ValidateProjectPathCommand = new AsyncRelayCommand(ValidateProjectPathAsync, onExceptionAsync: HandleCommandExceptionAsync);
         BrowseTiaInstallationPathOverrideCommand = new AsyncRelayCommand(BrowseTiaInstallationPathOverrideAsync, onExceptionAsync: HandleCommandExceptionAsync);
         ValidateTiaInstallationPathOverrideCommand = new AsyncRelayCommand(ValidateTiaInstallationPathOverrideAsync, onExceptionAsync: HandleCommandExceptionAsync);
         ExportCommand = new AsyncRelayCommand(ExportAsync, CanExport, HandleCommandExceptionAsync);
@@ -94,6 +98,16 @@ public sealed class MainWindowViewModel : ObservableObject
     /// Gets the command that detects installed TIA versions.
     /// </summary>
     public AsyncRelayCommand DiscoverVersionsCommand { get; }
+
+    /// <summary>
+    /// Gets the command that opens a file picker for the source TIA project path.
+    /// </summary>
+    public AsyncRelayCommand BrowseProjectPathCommand { get; }
+
+    /// <summary>
+    /// Gets the command that validates the selected TIA project path.
+    /// </summary>
+    public AsyncRelayCommand ValidateProjectPathCommand { get; }
 
     /// <summary>
     /// Gets the command that opens a folder picker for the manual TIA installation path override.
@@ -136,7 +150,25 @@ public sealed class MainWindowViewModel : ObservableObject
     public string ProjectPath
     {
         get => _projectPath;
-        set => SetProperty(ref _projectPath, value);
+        set
+        {
+            if (SetProperty(ref _projectPath, value))
+            {
+                ExportCommand.RaiseCanExecuteChanged();
+                ProjectPathValidationText = string.IsNullOrWhiteSpace(value)
+                    ? "Set a TIA project path (.ap18/.ap19/.ap20) before export."
+                    : "Path changed. Click 'Validate Project' to verify availability.";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the validation feedback for the selected project path.
+    /// </summary>
+    public string ProjectPathValidationText
+    {
+        get => _projectPathValidationText;
+        set => SetProperty(ref _projectPathValidationText, value);
     }
 
     /// <summary>
@@ -323,6 +355,43 @@ public sealed class MainWindowViewModel : ObservableObject
             : $"Detected {installations.Count} supported TIA version(s)";
     }
 
+    private Task BrowseProjectPathAsync()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select TIA Project File",
+            Filter = "TIA Project (*.ap18;*.ap19;*.ap20)|*.ap18;*.ap19;*.ap20|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (File.Exists(ProjectPath))
+        {
+            dialog.FileName = ProjectPath;
+            dialog.InitialDirectory = Path.GetDirectoryName(ProjectPath) ?? string.Empty;
+        }
+        else if (Directory.Exists(ProjectPath))
+        {
+            dialog.InitialDirectory = ProjectPath;
+        }
+
+        var result = dialog.ShowDialog();
+
+        if (result == true)
+        {
+            ProjectPath = dialog.FileName;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ValidateProjectPathAsync()
+    {
+        var validation = ValidateProjectPath(ProjectPath);
+        ProjectPathValidationText = validation.Message;
+        return Task.CompletedTask;
+    }
+
     private Task BrowseTiaInstallationPathOverrideAsync()
     {
         var selectedPath = _folderSelectionService.PickFolder(TiaInstallationPathOverride);
@@ -379,6 +448,17 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task ExportAsync()
     {
+        var projectPathValidation = ValidateProjectPath(ProjectPath);
+
+        if (!projectPathValidation.IsValid)
+        {
+            StatusText = "Export not started";
+            CurrentObject = "Invalid project path";
+            ProjectPathValidationText = projectPathValidation.Message;
+            _logCollector.Add($"Export aborted: {projectPathValidation.Message}");
+            return;
+        }
+
         StatusText = "Running export";
         ProgressText = "Preparing repository export";
         CurrentObject = "Initializing";
@@ -408,7 +488,9 @@ public sealed class MainWindowViewModel : ObservableObject
             SucceededCount = report.SucceededCount;
             FailedCount = report.FailedCount;
             IssueCount = report.Issues.Count;
-            StatusText = report.FailedCount == 0 ? "Export completed" : "Export completed with issues";
+            StatusText = report.FailedCount == 0 && report.Issues.Count == 0
+                ? "Export completed"
+                : "Export completed with issues";
             ProgressText = $"{report.SucceededCount} succeeded, {report.FailedCount} failed";
             CurrentObject = "Export finished";
             EstimatedRemainingText = "No remaining work";
@@ -458,7 +540,10 @@ public sealed class MainWindowViewModel : ObservableObject
         }).Task;
     }
 
-    private bool CanExport() => !IsExporting && !string.IsNullOrWhiteSpace(OutputDirectory);
+    private bool CanExport() =>
+        !IsExporting
+        && !string.IsNullOrWhiteSpace(OutputDirectory)
+        && !string.IsNullOrWhiteSpace(ProjectPath);
 
     private bool CanCancelExport() => IsExporting && _exportCancellationTokenSource is { IsCancellationRequested: false };
 
@@ -469,6 +554,11 @@ public sealed class MainWindowViewModel : ObservableObject
         ProjectPath = string.IsNullOrWhiteSpace(persisted.LastProjectPath)
             ? ProjectPath
             : persisted.LastProjectPath;
+
+        if (!string.IsNullOrWhiteSpace(ProjectPath))
+        {
+            ProjectPathValidationText = "Loaded persisted project path. Click 'Validate Project' to verify availability.";
+        }
 
         TiaInstallationPathOverride = string.IsNullOrWhiteSpace(persisted.TiaInstallationPathOverride)
             ? TiaInstallationPathOverride
@@ -567,6 +657,39 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         return formats;
+    }
+
+    private static (bool IsValid, string Message) ValidateProjectPath(string? projectPath)
+    {
+        var candidate = projectPath?.Trim();
+
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return (false, "Project path is required.");
+        }
+
+        var existsAsFile = File.Exists(candidate);
+        var existsAsDirectory = Directory.Exists(candidate);
+
+        if (!existsAsFile && !existsAsDirectory)
+        {
+            return (false, "Project path does not exist.");
+        }
+
+        var extension = existsAsFile
+            ? Path.GetExtension(candidate)
+            : Path.GetExtension(candidate.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+        var isKnownTiaProjectExtension = string.Equals(extension, ".ap18", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".ap19", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".ap20", StringComparison.OrdinalIgnoreCase);
+
+        if (!isKnownTiaProjectExtension)
+        {
+            return (false, "Project path must point to a .ap18, .ap19, or .ap20 project.");
+        }
+
+        return (true, $"Valid project path: {candidate}");
     }
 
     private void OnLogEntryAdded(object? sender, string entry)

@@ -65,7 +65,31 @@
 
                     <TextBlock Margin="0,16,0,4"
                                Text="TIA Project Path" />
-                    <TextBox Text="{Binding ProjectPath, UpdateSourceTrigger=PropertyChanged}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox Grid.Column="0"
+                                 Margin="0,0,8,0"
+                                 ToolTip="Select a TIA project file (.ap18/.ap19/.ap20)."
+                                 Text="{Binding ProjectPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1"
+                                Margin="0,0,8,0"
+                                Padding="12,4"
+                                Command="{Binding BrowseProjectPathCommand}"
+                                Content="Browse" />
+                        <Button Grid.Column="2"
+                                Padding="12,4"
+                                Command="{Binding ValidateProjectPathCommand}"
+                                Content="Validate Project" />
+                    </Grid>
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="#52624D"
+                               TextWrapping="Wrap"
+                               Text="{Binding ProjectPathValidationText}" />
 
                     <TextBlock Margin="0,16,0,4"
                                Text="Output Folder" />

@@ -33,6 +33,7 @@ public sealed class ProjectInventoryStageTests
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("AI_PROJECT_SUMMARY.md", StringComparison.Ordinal));
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("AI_HARDWARE_SUMMARY.md", StringComparison.Ordinal));
         Assert.Single(report.Issues);
+        Assert.Equal(1, report.FailedCount);
     }
 
     private sealed class StubInventoryProvider : ITiaProjectInventoryProvider
