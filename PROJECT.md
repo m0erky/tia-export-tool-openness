@@ -36,7 +36,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.1**
+Version baseline for this milestone: **0.0.2**
 
 Scope:
 
@@ -188,6 +188,10 @@ Scope:
 - Added test coverage for the root-only+issue inventory classification case.
 - Updated partial-inventory unit fixture to include root + device objects so it remains classified as `Partial` under the new root-only failure heuristic.
 - Updated the corresponding assertion in partial-inventory unit tests to expect two objects (root + device) after fixture expansion.
+- Added persistent UI log snapshot storage in `UiLogCollector` so failure diagnostics can include prior runtime log context.
+- Added export/command failure diagnostics file output to `Export/Reports/EXPORT_FAILURE.log` with stack trace and runtime context.
+- Added app-level crash file logging under `%LocalAppData%/TiaProjectExporter/CrashLogs` for unhandled UI/startup/task exceptions.
+- Incremented application version to `0.0.2` in central build metadata and version fallback logic.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
@@ -200,6 +204,7 @@ Scope:
 - Registry-based TIA installation detection currently uses best-effort value probing and needs validation against real customer installations.
 - Manual override V20 path detection is heuristic (`V20`/`PublicAPI/V20`) and should be cross-validated against broader enterprise install layouts.
 - Source project browse currently uses file picker workflow; directory-style `.apXX` project selection still relies on manual path input.
+- Linux-based automated test environment still cannot validate WPF runtime crash-path handling; verify new diagnostics files on Windows runtime failures.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.

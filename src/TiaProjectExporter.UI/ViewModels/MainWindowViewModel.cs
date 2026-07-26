@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -516,6 +517,21 @@ public sealed class MainWindowViewModel : ObservableObject
             EstimatedRemainingText = "No remaining work";
             _logCollector.Add("Export canceled by user request.");
         }
+        catch (Exception exception)
+        {
+            StatusText = "Export failed";
+            ProgressText = "Export aborted due to an error";
+            CurrentObject = exception.Message;
+            EstimatedRemainingText = "Operation aborted";
+            _logCollector.Add($"Export failed: {exception}");
+
+            var diagnosticsPath = await WriteFailureDiagnosticsAsync(exception, CancellationToken.None).ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(diagnosticsPath))
+            {
+                _logCollector.Add($"Failure diagnostics written to: {diagnosticsPath}");
+            }
+        }
         finally
         {
             await SavePersistedSettingsAsync(CancellationToken.None);
@@ -635,13 +651,19 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    private Task HandleCommandExceptionAsync(Exception exception)
+    private async Task HandleCommandExceptionAsync(Exception exception)
     {
         StatusText = "Operation failed";
         CurrentObject = exception.Message;
         EstimatedRemainingText = "Operation aborted";
         _logCollector.Add($"UI command failure: {exception}");
-        return Task.CompletedTask;
+
+        var diagnosticsPath = await WriteFailureDiagnosticsAsync(exception, CancellationToken.None).ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(diagnosticsPath))
+        {
+            _logCollector.Add($"Failure diagnostics written to: {diagnosticsPath}");
+        }
     }
 
     private IReadOnlyCollection<ExportFormat> BuildFormats()
@@ -721,7 +743,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.1";
+            return "0.0.2";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
@@ -729,7 +751,14 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private void OnLogEntryAdded(object? sender, string entry)
     {
-        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        var dispatcher = System.Windows.Application.Current.Dispatcher;
+
+        if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+        {
+            return;
+        }
+
+        dispatcher.Invoke(() =>
         {
             LogEntries.Add(entry);
 
@@ -738,5 +767,47 @@ public sealed class MainWindowViewModel : ObservableObject
                 LogEntries.RemoveAt(0);
             }
         });
+    }
+
+    private async Task<string?> WriteFailureDiagnosticsAsync(Exception exception, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(OutputDirectory))
+        {
+            return null;
+        }
+
+        try
+        {
+            var reportsDirectory = Path.Combine(OutputDirectory, "Export", "Reports");
+            Directory.CreateDirectory(reportsDirectory);
+
+            var diagnosticsPath = Path.Combine(reportsDirectory, "EXPORT_FAILURE.log");
+            var builder = new StringBuilder();
+            builder.AppendLine("# Export Failure Diagnostics");
+            builder.AppendLine();
+            builder.AppendLine($"Timestamp (UTC): {DateTimeOffset.UtcNow:O}");
+            builder.AppendLine($"Version: {AppVersion}");
+            builder.AppendLine($"ProjectPath: {ProjectPath}");
+            builder.AppendLine($"OutputDirectory: {OutputDirectory}");
+            builder.AppendLine($"TiaOverridePath: {TiaInstallationPathOverride}");
+            builder.AppendLine();
+            builder.AppendLine("## Exception");
+            builder.AppendLine(exception.ToString());
+            builder.AppendLine();
+            builder.AppendLine("## UI Log Snapshot");
+
+            foreach (var entry in _logCollector.Snapshot)
+            {
+                builder.AppendLine(entry);
+            }
+
+            await File.WriteAllTextAsync(diagnosticsPath, builder.ToString(), cancellationToken).ConfigureAwait(false);
+            return diagnosticsPath;
+        }
+        catch (Exception logException)
+        {
+            _logCollector.Add($"Failed to write failure diagnostics: {logException.Message}");
+            return null;
+        }
     }
 }

@@ -70,7 +70,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.1`
+- Current application version: `0.0.2`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -217,6 +217,10 @@ Current keys:
   - Check `Export/Reports/TIA_PROJECT_INVENTORY.md` and `Export/EXPORT_REPORT.md` for traversal issues.
   - If inventory status is `Unavailable` or `Partial`, the run is now reported as "completed with issues" instead of plain success.
   - Openness traversal errors now include unwrapped inner exception details to make root-cause diagnosis (version mismatch, access mode, lock/session issues) easier.
+
+- **Export aborts and no log appears in output**
+  - The UI now writes `Export/Reports/EXPORT_FAILURE.log` on command/export failures, including exception stack and UI log snapshot.
+  - Application-level crashes are additionally written under `%LocalAppData%/TiaProjectExporter/CrashLogs`.
   - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note

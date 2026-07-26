@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -73,6 +74,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
+            _ = TryWriteCrashLog("Startup", exception);
             System.Windows.MessageBox.Show(
                 $"Application startup failed.\n\n{exception}",
                 "TIA Project Exporter",
@@ -111,6 +113,7 @@ public partial class App : System.Windows.Application
 
     private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        _ = TryWriteCrashLog("DispatcherUnhandledException", e.Exception);
         System.Windows.MessageBox.Show(
             $"Unexpected error:\n\n{e.Exception.Message}",
             "TIA Project Exporter",
@@ -123,6 +126,7 @@ public partial class App : System.Windows.Application
     {
         if (e.ExceptionObject is Exception exception)
         {
+            _ = TryWriteCrashLog("AppDomainUnhandledException", exception);
             System.Windows.MessageBox.Show(
                 $"Unhandled application error:\n\n{exception.Message}",
                 "TIA Project Exporter",
@@ -133,6 +137,28 @@ public partial class App : System.Windows.Application
 
     private static void OnTaskSchedulerUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
+        _ = TryWriteCrashLog("UnobservedTaskException", e.Exception);
         e.SetObserved();
+    }
+
+    private static string? TryWriteCrashLog(string scope, Exception exception)
+    {
+        try
+        {
+            var logDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "TiaProjectExporter",
+                "CrashLogs");
+            Directory.CreateDirectory(logDirectory);
+
+            var logPath = Path.Combine(logDirectory, $"crash-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.log");
+            var content = $"Scope: {scope}{Environment.NewLine}TimestampUtc: {DateTimeOffset.UtcNow:O}{Environment.NewLine}{Environment.NewLine}{exception}";
+            File.WriteAllText(logPath, content);
+            return logPath;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
