@@ -13,6 +13,32 @@ internal static class Program
     {
         Console.OutputEncoding = Encoding.UTF8;
 
+        if (args.Any(argument => string.Equals(argument, "--health", StringComparison.OrdinalIgnoreCase)))
+        {
+            HostHealthResponse healthResponse;
+
+            try
+            {
+                var options = HostOptions.Parse(args, requireProjectPath: false);
+                healthResponse = ExecuteHealthCheck(options);
+            }
+            catch (Exception exception)
+            {
+                healthResponse = new HostHealthResponse
+                {
+                    Healthy = false,
+                    Details =
+                    [
+                        "Health check failed before execution.",
+                        DescribeException(exception)
+                    ]
+                };
+            }
+
+            WriteJson(healthResponse);
+            return 0;
+        }
+
         HostTraversalResponse response;
 
         try
@@ -41,6 +67,63 @@ internal static class Program
 
         WriteJson(response);
         return 0;
+    }
+
+    private static HostHealthResponse ExecuteHealthCheck(HostOptions options)
+    {
+        var details = new List<string>();
+
+        if (Environment.OSVersion.Platform != PlatformID.Win32NT)
+        {
+            details.Add("Host health check supports Windows only.");
+            return new HostHealthResponse { Healthy = false, Details = details };
+        }
+
+        var assemblyPath = ResolveEngineeringAssemblyPath(options.InstallPath);
+
+        if (string.IsNullOrWhiteSpace(assemblyPath))
+        {
+            details.Add("Siemens.Engineering.dll not found for provided installation path.");
+            details.Add($"InstallPath: {options.InstallPath}");
+            return new HostHealthResponse { Healthy = false, Details = details };
+        }
+
+        details.Add($"Siemens.Engineering.dll: {assemblyPath}");
+
+        try
+        {
+            var engineeringAssembly = Assembly.LoadFrom(assemblyPath);
+            details.Add($"Loaded assembly: {engineeringAssembly.FullName}");
+
+            var contractCandidatePath = Path.Combine(Path.GetDirectoryName(assemblyPath) ?? string.Empty, "Siemens.Engineering.Contract.dll");
+
+            if (File.Exists(contractCandidatePath))
+            {
+                var contractAssembly = Assembly.LoadFrom(contractCandidatePath);
+                details.Add($"Loaded contract assembly: {contractAssembly.FullName}");
+            }
+            else
+            {
+                details.Add("Siemens.Engineering.Contract.dll not found beside Siemens.Engineering.dll.");
+            }
+
+            var tiaPortalType = engineeringAssembly.GetType("Siemens.Engineering.TiaPortal");
+            var modeType = engineeringAssembly.GetType("Siemens.Engineering.TiaPortalMode");
+
+            if (tiaPortalType is null || modeType is null)
+            {
+                details.Add("Expected Siemens types (TiaPortal/TiaPortalMode) not found.");
+                return new HostHealthResponse { Healthy = false, Details = details };
+            }
+
+            details.Add("Required Siemens runtime types are available.");
+            return new HostHealthResponse { Healthy = true, Details = details };
+        }
+        catch (Exception exception)
+        {
+            details.Add(DescribeException(exception));
+            return new HostHealthResponse { Healthy = false, Details = details };
+        }
     }
 
     private static HostTraversalResponse ExecuteTraversal(HostOptions options)
@@ -581,12 +664,12 @@ internal sealed class HostOptions
 
     public string InstallPath { get; init; } = string.Empty;
 
-    public static HostOptions Parse(string[] args)
+    public static HostOptions Parse(string[] args, bool requireProjectPath = true)
     {
         var projectPath = GetValue(args, "--project");
         var installPath = GetValue(args, "--install");
 
-        if (string.IsNullOrWhiteSpace(projectPath))
+        if (requireProjectPath && string.IsNullOrWhiteSpace(projectPath))
         {
             throw new ArgumentException("Missing --project argument.");
         }
@@ -598,7 +681,7 @@ internal sealed class HostOptions
 
         return new HostOptions
         {
-            ProjectPath = projectPath,
+            ProjectPath = projectPath ?? string.Empty,
             InstallPath = installPath
         };
     }
@@ -663,4 +746,14 @@ internal sealed class HostIssue
 
     [DataMember(Name = "details")]
     public string? Details { get; set; }
+}
+
+[DataContract]
+internal sealed class HostHealthResponse
+{
+    [DataMember(Name = "healthy")]
+    public bool Healthy { get; set; }
+
+    [DataMember(Name = "details")]
+    public List<string> Details { get; set; } = new();
 }

@@ -20,6 +20,7 @@ public sealed class MainWindowViewModel : ObservableObject
 {
     private const int MaxRecentOutputDirectories = 10;
     private readonly ITiaInstallationDiscoveryService _installationDiscoveryService;
+    private readonly IOpennessHealthCheckService _opennessHealthCheckService;
     private readonly ExportCoordinator _exportCoordinator;
     private readonly IExporterSettingsStore _settingsStore;
     private readonly IFolderSelectionService _folderSelectionService;
@@ -42,6 +43,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private int _issueCount;
     private string _projectPathValidationText = "Set a TIA project path (.ap18/.ap19/.ap20) before export.";
     private string _tiaInstallationValidationText = "Manual TIA installation override is optional.";
+    private string _healthCheckStatusText = "Health check not executed yet.";
+    private string _healthCheckIndicatorBrush = "#6B7280";
     private bool _isExporting;
     private CancellationTokenSource? _exportCancellationTokenSource;
 
@@ -52,6 +55,7 @@ public sealed class MainWindowViewModel : ObservableObject
     /// </summary>
     public MainWindowViewModel(
         ITiaInstallationDiscoveryService installationDiscoveryService,
+        IOpennessHealthCheckService opennessHealthCheckService,
         ExportCoordinator exportCoordinator,
         ExporterSettings settings,
         IExporterSettingsStore settingsStore,
@@ -59,6 +63,7 @@ public sealed class MainWindowViewModel : ObservableObject
         UiLogCollector logCollector)
     {
         _installationDiscoveryService = installationDiscoveryService;
+        _opennessHealthCheckService = opennessHealthCheckService;
         _exportCoordinator = exportCoordinator;
         _settingsStore = settingsStore;
         _folderSelectionService = folderSelectionService;
@@ -70,6 +75,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _skipDiagnostics = settings.SkipDiagnostics;
 
         DiscoverVersionsCommand = new AsyncRelayCommand(DiscoverVersionsAsync, onExceptionAsync: HandleCommandExceptionAsync);
+        RunHealthCheckCommand = new AsyncRelayCommand(RunHealthCheckAsync, onExceptionAsync: HandleCommandExceptionAsync);
         BrowseProjectPathCommand = new AsyncRelayCommand(BrowseProjectPathAsync, onExceptionAsync: HandleCommandExceptionAsync);
         ValidateProjectPathCommand = new AsyncRelayCommand(ValidateProjectPathAsync, onExceptionAsync: HandleCommandExceptionAsync);
         BrowseTiaInstallationPathOverrideCommand = new AsyncRelayCommand(BrowseTiaInstallationPathOverrideAsync, onExceptionAsync: HandleCommandExceptionAsync);
@@ -101,6 +107,11 @@ public sealed class MainWindowViewModel : ObservableObject
     /// Gets the command that detects installed TIA versions.
     /// </summary>
     public AsyncRelayCommand DiscoverVersionsCommand { get; }
+
+    /// <summary>
+    /// Gets the command that executes an Openness runtime health check.
+    /// </summary>
+    public AsyncRelayCommand RunHealthCheckCommand { get; }
 
     /// <summary>
     /// Gets the command that opens a file picker for the source TIA project path.
@@ -174,6 +185,24 @@ public sealed class MainWindowViewModel : ObservableObject
     /// Gets the display-friendly application version.
     /// </summary>
     public string VersionText => $"Version {AppVersion}";
+
+    /// <summary>
+    /// Gets or sets the high-level runtime health-check status text.
+    /// </summary>
+    public string HealthCheckStatusText
+    {
+        get => _healthCheckStatusText;
+        set => SetProperty(ref _healthCheckStatusText, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the indicator brush for runtime health status.
+    /// </summary>
+    public string HealthCheckIndicatorBrush
+    {
+        get => _healthCheckIndicatorBrush;
+        set => SetProperty(ref _healthCheckIndicatorBrush, value);
+    }
 
     /// <summary>
     /// Gets or sets the validation feedback for the selected project path.
@@ -366,6 +395,38 @@ public sealed class MainWindowViewModel : ObservableObject
         StatusText = installations.Count == 0
             ? "No supported TIA versions detected"
             : $"Detected {installations.Count} supported TIA version(s)";
+    }
+
+    private async Task RunHealthCheckAsync()
+    {
+        StatusText = "Running Openness health check";
+        HealthCheckStatusText = "Running health check...";
+        HealthCheckIndicatorBrush = "#F59E0B";
+
+        var result = await _opennessHealthCheckService
+            .CheckAsync(string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim(), CancellationToken.None);
+
+        var summary = string.IsNullOrWhiteSpace(result.Summary)
+            ? "No summary available"
+            : result.Summary;
+
+        HealthCheckStatusText = result.Details.Count > 0
+            ? $"{summary} | {result.Details[0]}"
+            : summary;
+
+        HealthCheckIndicatorBrush = result.State switch
+        {
+            OpennessHealthCheckState.Healthy => "#16A34A",
+            OpennessHealthCheckState.Warning => "#F59E0B",
+            _ => "#DC2626"
+        };
+
+        StatusText = "Health check completed";
+
+        foreach (var detail in result.Details)
+        {
+            _logCollector.Add($"HealthCheck: {detail}");
+        }
     }
 
     private Task BrowseProjectPathAsync()
@@ -743,7 +804,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.4";
+            return "0.0.5";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";

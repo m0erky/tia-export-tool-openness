@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.4**
+Version baseline for this milestone: **0.0.5**
 
 Scope:
 
@@ -203,6 +203,11 @@ Scope:
 - Added packaging integration so UI build/publish copies `TiaProjectExporter.OpennessHost.exe` and `.config` into output directories.
 - Added Linux-safe unit test coverage for out-of-process adapter non-Windows behavior.
 - Incremented application version to `0.0.4` in central build metadata and UI fallback version resolution.
+- Added dedicated Openness health-check service (`IOpennessHealthCheckService`) with host-process validation and detailed diagnostics.
+- Extended Openness host with `--health` execution mode to verify Siemens assembly loadability without full traversal.
+- Added UI `Health Check` command plus traffic-light indicator (green/yellow/red) and status text.
+- Added Linux-safe unit test coverage for out-of-process health-check service non-Windows behavior.
+- Incremented application version to `0.0.5` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

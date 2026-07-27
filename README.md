@@ -71,7 +71,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.4`
+- Current application version: `0.0.5`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -113,6 +113,7 @@ Windows validation workflow artifacts:
 
 1. Start `TiaProjectExporter.UI`.
 2. Click **Detect Versions** (optional but recommended).
+   - Click **Health Check** to verify host deployment and Siemens runtime loadability before export.
 3. Enter/select:
    - **Project Path**: source TIA project (`.ap18`, `.ap19`, `.ap20`)
      - use **Browse** to pick the project file
@@ -237,6 +238,7 @@ Current keys:
 - **`Siemens.Engineering.Contract` / `MissingMethodException` crashes**
   - The exporter now executes Openness in a separate host process (`TiaProjectExporter.OpennessHost.exe`, .NET Framework 4.8) to avoid .NET 8 in-process loader incompatibilities.
   - Ensure the host executable is deployed beside the UI executable (or set environment variable `TIA_EXPORTER_OPENNESS_HOST_PATH`).
+  - Use the UI **Health Check** button (traffic-light indicator) to validate host + runtime state before running export.
   - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note

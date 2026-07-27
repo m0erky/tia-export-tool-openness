@@ -12,7 +12,6 @@ namespace TiaProjectExporter.Tia.Inventory;
 /// </summary>
 public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessAdapter
 {
-    private const string HostPathEnvironmentVariable = "TIA_EXPORTER_OPENNESS_HOST_PATH";
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -85,7 +84,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
                 new ExportIssue(
                     "OpennessHost",
                     "Openness host executable was not found.",
-                    $"Set environment variable {HostPathEnvironmentVariable} or deploy TiaProjectExporter.OpennessHost.exe next to the UI executable.")
+                    $"Set environment variable {OutOfProcessHostLocator.HostPathEnvironmentVariable} or deploy TiaProjectExporter.OpennessHost.exe next to the UI executable.")
             ]);
         }
 
@@ -187,26 +186,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
 
     private static string? ResolveHostExecutablePath()
     {
-        var environmentPath = Environment.GetEnvironmentVariable(HostPathEnvironmentVariable);
-
-        if (!string.IsNullOrWhiteSpace(environmentPath) && File.Exists(environmentPath))
-        {
-            return environmentPath;
-        }
-
-        var baseDirectory = AppContext.BaseDirectory;
-        var directCandidate = Path.Combine(baseDirectory, "TiaProjectExporter.OpennessHost.exe");
-
-        if (File.Exists(directCandidate))
-        {
-            return directCandidate;
-        }
-
-        var nestedCandidate = Path.Combine(baseDirectory, "OpennessHost", "TiaProjectExporter.OpennessHost.exe");
-
-        return File.Exists(nestedCandidate)
-            ? nestedCandidate
-            : null;
+        return OutOfProcessHostLocator.ResolveHostExecutablePath();
     }
 
     private static async Task<HostTraversalResponse?> ExecuteHostAsync(
