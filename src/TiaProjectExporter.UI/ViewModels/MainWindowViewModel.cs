@@ -533,6 +533,43 @@ public sealed class MainWindowViewModel : ObservableObject
             return;
         }
 
+        var outputValidation = ValidateOutputDirectory(OutputDirectory);
+
+        if (!outputValidation.IsValid)
+        {
+            StatusText = "Export not started";
+            CurrentObject = "Invalid output directory";
+            _logCollector.Add($"Export aborted: {outputValidation.Message}");
+            return;
+        }
+
+        var healthCheckResult = await _opennessHealthCheckService
+            .CheckAsync(string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim(), CancellationToken.None);
+
+        HealthCheckIndicatorBrush = healthCheckResult.State switch
+        {
+            OpennessHealthCheckState.Healthy => "#16A34A",
+            OpennessHealthCheckState.Warning => "#F59E0B",
+            _ => "#DC2626"
+        };
+
+        HealthCheckStatusText = healthCheckResult.Details.Count > 0
+            ? $"{healthCheckResult.Summary} | {healthCheckResult.Details[0]}"
+            : healthCheckResult.Summary;
+
+        foreach (var detail in healthCheckResult.Details)
+        {
+            _logCollector.Add($"ExportPreflight: {detail}");
+        }
+
+        if (healthCheckResult.State == OpennessHealthCheckState.Unhealthy)
+        {
+            StatusText = "Export not started";
+            CurrentObject = "Openness health check failed";
+            _logCollector.Add($"Export aborted: {healthCheckResult.Summary}");
+            return;
+        }
+
         StatusText = "Running export";
         ProgressText = "Preparing repository export";
         CurrentObject = "Initializing";
@@ -787,6 +824,29 @@ public sealed class MainWindowViewModel : ObservableObject
         return (true, $"Valid project path: {candidate}");
     }
 
+    private static (bool IsValid, string Message) ValidateOutputDirectory(string? outputDirectory)
+    {
+        var candidate = outputDirectory?.Trim();
+
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return (false, "Output directory is required.");
+        }
+
+        try
+        {
+            Directory.CreateDirectory(candidate);
+            var probePath = Path.Combine(candidate, ".tia-exporter-write-test.tmp");
+            File.WriteAllText(probePath, "probe");
+            File.Delete(probePath);
+            return (true, $"Output directory is writable: {candidate}");
+        }
+        catch (Exception exception)
+        {
+            return (false, $"Output directory is not writable: {exception.Message}");
+        }
+    }
+
     private static string ResolveAppVersion()
     {
         var informationalVersion = Assembly.GetEntryAssembly()?
@@ -804,7 +864,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.7";
+            return "0.0.8";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
@@ -832,43 +892,63 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task<string?> WriteFailureDiagnosticsAsync(Exception exception, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(OutputDirectory))
-        {
-            return null;
-        }
+        var diagnosticsContent = BuildFailureDiagnosticsContent(exception);
 
         try
         {
-            var reportsDirectory = Path.Combine(OutputDirectory, "Export", "Reports");
-            Directory.CreateDirectory(reportsDirectory);
-
-            var diagnosticsPath = Path.Combine(reportsDirectory, "EXPORT_FAILURE.log");
-            var builder = new StringBuilder();
-            builder.AppendLine("# Export Failure Diagnostics");
-            builder.AppendLine();
-            builder.AppendLine($"Timestamp (UTC): {DateTimeOffset.UtcNow:O}");
-            builder.AppendLine($"Version: {AppVersion}");
-            builder.AppendLine($"ProjectPath: {ProjectPath}");
-            builder.AppendLine($"OutputDirectory: {OutputDirectory}");
-            builder.AppendLine($"TiaOverridePath: {TiaInstallationPathOverride}");
-            builder.AppendLine();
-            builder.AppendLine("## Exception");
-            builder.AppendLine(exception.ToString());
-            builder.AppendLine();
-            builder.AppendLine("## UI Log Snapshot");
-
-            foreach (var entry in _logCollector.Snapshot)
+            if (!string.IsNullOrWhiteSpace(OutputDirectory))
             {
-                builder.AppendLine(entry);
+                var reportsDirectory = Path.Combine(OutputDirectory, "Export", "Reports");
+                Directory.CreateDirectory(reportsDirectory);
+                var diagnosticsPath = Path.Combine(reportsDirectory, "EXPORT_FAILURE.log");
+                await File.WriteAllTextAsync(diagnosticsPath, diagnosticsContent, cancellationToken).ConfigureAwait(false);
+                return diagnosticsPath;
             }
-
-            await File.WriteAllTextAsync(diagnosticsPath, builder.ToString(), cancellationToken).ConfigureAwait(false);
-            return diagnosticsPath;
         }
         catch (Exception logException)
         {
             _logCollector.Add($"Failed to write failure diagnostics: {logException.Message}");
+        }
+
+        try
+        {
+            var fallbackDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "TiaProjectExporter",
+                "FailureDiagnostics");
+            Directory.CreateDirectory(fallbackDirectory);
+            var fallbackPath = Path.Combine(fallbackDirectory, $"export-failure-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.log");
+            await File.WriteAllTextAsync(fallbackPath, diagnosticsContent, cancellationToken).ConfigureAwait(false);
+            return fallbackPath;
+        }
+        catch (Exception fallbackException)
+        {
+            _logCollector.Add($"Failed to write fallback diagnostics: {fallbackException.Message}");
             return null;
         }
+    }
+
+    private string BuildFailureDiagnosticsContent(Exception exception)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("# Export Failure Diagnostics");
+        builder.AppendLine();
+        builder.AppendLine($"Timestamp (UTC): {DateTimeOffset.UtcNow:O}");
+        builder.AppendLine($"Version: {AppVersion}");
+        builder.AppendLine($"ProjectPath: {ProjectPath}");
+        builder.AppendLine($"OutputDirectory: {OutputDirectory}");
+        builder.AppendLine($"TiaOverridePath: {TiaInstallationPathOverride}");
+        builder.AppendLine();
+        builder.AppendLine("## Exception");
+        builder.AppendLine(exception.ToString());
+        builder.AppendLine();
+        builder.AppendLine("## UI Log Snapshot");
+
+        foreach (var entry in _logCollector.Snapshot)
+        {
+            builder.AppendLine(entry);
+        }
+
+        return builder.ToString();
     }
 }

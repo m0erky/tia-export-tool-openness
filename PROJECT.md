@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.7**
+Version baseline for this milestone: **0.0.8**
 
 Scope:
 
@@ -214,6 +214,11 @@ Scope:
 - Reworked UI build orchestration to invoke host build via MSBuild target instead of cross-TFM project reference to avoid NU1702 compatibility warning.
 - Documented .NET Framework 4.8 Developer Pack prerequisite for Windows builds.
 - Incremented application version to `0.0.7` in central build metadata and UI fallback version resolution.
+- Added export preflight validation for writable output directories (active probe file create/delete) to prevent silent no-output runs.
+- Added automatic pre-export Openness health-check gate in UI; export now aborts early when health state is `Unhealthy`.
+- Added warning-state handling for missing `Siemens.Engineering.Contract.dll` in health checks (amber status instead of green).
+- Added fallback failure diagnostics path `%LocalAppData%/TiaProjectExporter/FailureDiagnostics` when output-folder diagnostic write fails.
+- Incremented application version to `0.0.8` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

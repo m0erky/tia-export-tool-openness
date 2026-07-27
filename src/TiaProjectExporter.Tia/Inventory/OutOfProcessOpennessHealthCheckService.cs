@@ -79,6 +79,14 @@ public sealed class OutOfProcessOpennessHealthCheckService : IOpennessHealthChec
 
         if (healthResponse.Healthy)
         {
+            var hasContractWarning = details.Any(detail =>
+                detail.Contains("Contract.dll not found", StringComparison.OrdinalIgnoreCase));
+
+            if (hasContractWarning)
+            {
+                return new OpennessHealthCheckResult(OpennessHealthCheckState.Warning, "Openness host is reachable, but contract assembly warning detected", details);
+            }
+
             return new OpennessHealthCheckResult(OpennessHealthCheckState.Healthy, "Openness host is healthy", details);
         }
 

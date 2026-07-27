@@ -72,7 +72,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.7`
+- Current application version: `0.0.8`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -235,11 +235,13 @@ Current keys:
 - **Export aborts and no log appears in output**
   - The UI now writes `Export/Reports/EXPORT_FAILURE.log` on command/export failures, including exception stack and UI log snapshot.
   - Application-level crashes are additionally written under `%LocalAppData%/TiaProjectExporter/CrashLogs`.
+  - If the selected output path is not writable, fallback diagnostics are written to `%LocalAppData%/TiaProjectExporter/FailureDiagnostics`.
 
 - **`Siemens.Engineering.Contract` / `MissingMethodException` crashes**
   - The exporter now executes Openness in a separate host process (`TiaProjectExporter.OpennessHost.exe`, .NET Framework 4.8) to avoid .NET 8 in-process loader incompatibilities.
   - Ensure the host executable is deployed beside the UI executable (or set environment variable `TIA_EXPORTER_OPENNESS_HOST_PATH`).
   - Use the UI **Health Check** button (traffic-light indicator) to validate host + runtime state before running export.
+  - Export now runs an automatic preflight health check and output-writeability check before pipeline start, and aborts early with explicit log messages if preconditions fail.
   - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note
