@@ -580,16 +580,18 @@ internal static class Program
                     continue;
                 }
 
-                objects.Add(new HostObjectNode
+                var hostNode = new HostObjectNode
                 {
                     ObjectType = objectType,
                     Name = childName,
                     QualifiedPath = childPath,
                     Depth = current.Depth + 1,
                     Metadata = BuildNodeMetadata(child, "HostReflectionPlcFocus", childPath, issues)
-                });
+                };
 
-                EnrichWithDeepContent(child, objectType, childPath, objects[^1].Metadata, issues);
+                objects.Add(hostNode);
+
+                EnrichWithDeepContent(child, objectType, childPath, hostNode.Metadata, issues);
 
                 childrenAdded++;
                 queue.Enqueue((child, childPath, current.Depth + 1));
@@ -1099,7 +1101,7 @@ internal static class Program
 
             if (serializedValue.Length > MaxScalarMetadataValueLength)
             {
-                serializedValue = serializedValue[..MaxScalarMetadataValueLength];
+                serializedValue = serializedValue.Substring(0, MaxScalarMetadataValueLength);
             }
 
             metadata[$"Prop.{property.Name}"] = serializedValue;
@@ -1212,11 +1214,12 @@ internal static class Program
         try
         {
             var parameterType = exportMethod.GetParameters()[0].ParameterType;
-            var argument = parameterType == typeof(FileInfo)
-                ? new FileInfo(tempPath)
+            object argument = parameterType == typeof(FileInfo)
+                ? (object)new FileInfo(tempPath)
                 : tempPath;
 
-            _ = exportMethod.Invoke(runtimeNode, new[] { argument });
+            var arguments = new object[] { argument };
+            _ = exportMethod.Invoke(runtimeNode, arguments);
 
             if (!File.Exists(tempPath))
             {
