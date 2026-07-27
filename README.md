@@ -72,7 +72,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.8`
+- Current application version: `0.0.9`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -242,6 +242,13 @@ Current keys:
   - Ensure the host executable is deployed beside the UI executable (or set environment variable `TIA_EXPORTER_OPENNESS_HOST_PATH`).
   - Use the UI **Health Check** button (traffic-light indicator) to validate host + runtime state before running export.
   - Export now runs an automatic preflight health check and output-writeability check before pipeline start, and aborts early with explicit log messages if preconditions fail.
+
+- **Export seems stuck while CPU is high**
+  - The host now emits live heartbeats; UI shows a dedicated host-activity traffic light.
+  - Timeout guidance used by UI indicator:
+    - `<=15s` since last heartbeat: green (active)
+    - `16-60s`: yellow (delayed)
+    - `>60s`: red (stale, consider cancel/retry if persistent)
   - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note

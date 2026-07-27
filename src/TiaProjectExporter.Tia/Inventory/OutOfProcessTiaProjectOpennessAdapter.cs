@@ -90,7 +90,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
 
         try
         {
-            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, cancellationToken).ConfigureAwait(false);
+            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, _logger, cancellationToken).ConfigureAwait(false);
 
             if (response is null)
             {
@@ -193,6 +193,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         string hostPath,
         string projectPath,
         string installPath,
+        ILogger logger,
         CancellationToken cancellationToken)
     {
         var arguments = BuildArguments(projectPath, installPath);
@@ -216,7 +217,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         }
 
         var standardOutputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var standardErrorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var standardErrorTask = ConsumeStandardErrorAsync(process.StandardError, logger, cancellationToken);
 
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 
@@ -244,6 +245,58 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         return response;
     }
 
+    private static async Task<string> ConsumeStandardErrorAsync(StreamReader errorReader, ILogger logger, CancellationToken cancellationToken)
+    {
+        var builder = new StringBuilder();
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var line = await errorReader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+
+            if (line is null)
+            {
+                break;
+            }
+
+            if (TryParseHeartbeat(line, out var heartbeat))
+            {
+                logger.LogInformation("HostHeartbeat|{Timestamp}|{State}|{Phase}|{Detail}", heartbeat.TimestampUtc, heartbeat.State, heartbeat.Phase, heartbeat.Detail);
+                continue;
+            }
+
+            if (builder.Length > 0)
+            {
+                builder.AppendLine();
+            }
+
+            builder.Append(line);
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool TryParseHeartbeat(string line, out HeartbeatMessage heartbeat)
+    {
+        heartbeat = default;
+
+        if (!line.StartsWith("HB|", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var parts = line.Split('|');
+
+        if (parts.Length < 5)
+        {
+            return false;
+        }
+
+        heartbeat = new HeartbeatMessage(parts[1], parts[2], parts[3], parts[4]);
+        return true;
+    }
+
     private static string BuildArguments(string projectPath, string installPath)
     {
         var builder = new StringBuilder();
@@ -256,6 +309,8 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         string.IsNullOrWhiteSpace(value)
             ? "\"\""
             : $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
+
+    private readonly record struct HeartbeatMessage(string TimestampUtc, string State, string Phase, string Detail);
 
     private sealed class HostTraversalResponse
     {

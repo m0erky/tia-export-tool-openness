@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.8**
+Version baseline for this milestone: **0.0.9**
 
 Scope:
 
@@ -219,6 +219,10 @@ Scope:
 - Added warning-state handling for missing `Siemens.Engineering.Contract.dll` in health checks (amber status instead of green).
 - Added fallback failure diagnostics path `%LocalAppData%/TiaProjectExporter/FailureDiagnostics` when output-folder diagnostic write fails.
 - Incremented application version to `0.0.8` in central build metadata and UI fallback version resolution.
+- Added host heartbeat streaming from out-of-process host via stderr (`HB|...`) and adapter-side parsing/log forwarding.
+- Added dedicated UI host-activity liveness indicator (traffic light + heartbeat age text) independent from stage-level progress updates.
+- Implemented heartbeat timeout thresholds for liveness display (`<=15s` green, `16-60s` yellow, `>60s` red).
+- Incremented application version to `0.0.9` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

@@ -4,11 +4,14 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading;
 
 namespace TiaProjectExporter.OpennessHost;
 
 internal static class Program
 {
+    private static HeartbeatSession? _heartbeatSession;
+
     private static int Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
@@ -128,6 +131,9 @@ internal static class Program
 
     private static HostTraversalResponse ExecuteTraversal(HostOptions options)
     {
+        _heartbeatSession = new HeartbeatSession();
+        _heartbeatSession.UpdatePhase("Startup", "Preparing traversal host");
+
         var issues = new List<HostIssue>();
         var objects = new List<HostObjectNode>
         {
@@ -163,6 +169,7 @@ internal static class Program
         }
 
         var assemblyPath = ResolveEngineeringAssemblyPath(options.InstallPath);
+        _heartbeatSession.UpdatePhase("ResolveAssemblies", "Resolving Siemens.Engineering assembly");
 
         if (assemblyPath is null)
         {
@@ -187,6 +194,7 @@ internal static class Program
 
         try
         {
+            _heartbeatSession.UpdatePhase("LoadRuntime", "Loading Siemens runtime assemblies");
             var engineeringAssembly = Assembly.LoadFrom(assemblyPath);
             var tiaPortalType = engineeringAssembly.GetType("Siemens.Engineering.TiaPortal");
             var modeType = engineeringAssembly.GetType("Siemens.Engineering.TiaPortalMode");
@@ -204,6 +212,7 @@ internal static class Program
             }
 
             var mode = ResolvePortalMode(modeType);
+            _heartbeatSession.UpdatePhase("CreatePortal", "Creating TiaPortal instance");
             tiaPortal = Activator.CreateInstance(tiaPortalType, mode);
 
             if (tiaPortal is null)
@@ -231,6 +240,7 @@ internal static class Program
                 }
             });
 
+            _heartbeatSession.UpdatePhase("OpenProject", "Opening TIA project");
             project = OpenProject(tiaPortal, options.ProjectPath);
 
             if (project is null)
@@ -245,6 +255,7 @@ internal static class Program
                 return BuildResult(options.ProjectPath, objects, issues);
             }
 
+            _heartbeatSession.UpdatePhase("Traverse", "Walking project graph");
             TraverseProject(project, objects, issues);
         }
         catch (Exception exception)
@@ -261,6 +272,8 @@ internal static class Program
             TryCloseProject(project);
             TryDispose(project);
             TryDispose(tiaPortal);
+            _heartbeatSession?.Dispose();
+            _heartbeatSession = null;
         }
 
         return BuildResult(options.ProjectPath, objects, issues);
@@ -335,6 +348,7 @@ internal static class Program
 
     private static void TraverseProject(object project, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
     {
+        _heartbeatSession?.UpdatePhase("TraverseProject", "Inspecting project root and devices");
         var projectName = TryReadString(project, "Name");
 
         if (!string.IsNullOrWhiteSpace(projectName))
@@ -376,6 +390,7 @@ internal static class Program
             }
 
             var deviceName = TryReadString(device, "Name") ?? TryReadString(device, "DisplayName") ?? "Device";
+            _heartbeatSession?.UpdatePhase("TraverseDevice", $"Device: {deviceName}");
             var devicePath = $"Project/Devices/{deviceName}";
 
             objects.Add(new HostObjectNode
@@ -407,6 +422,7 @@ internal static class Program
 
     private static void TraverseSoftwareGraph(object root, string rootPath, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
     {
+        _heartbeatSession?.UpdatePhase("TraverseSoftware", $"Root: {rootPath}");
         var queue = new Queue<(object Node, string Path, int Depth)>();
         queue.Enqueue((root, rootPath, 1));
 
@@ -416,6 +432,11 @@ internal static class Program
         while (queue.Count > 0)
         {
             var current = queue.Dequeue();
+
+            if (current.Depth <= 3)
+            {
+                _heartbeatSession?.UpdatePhase("TraverseQueue", $"{current.Path} (depth {current.Depth})");
+            }
 
             if (current.Depth > 6)
             {
@@ -655,6 +676,38 @@ internal static class Program
         memoryStream.Position = 0;
         using var reader = new StreamReader(memoryStream, Encoding.UTF8);
         Console.Write(reader.ReadToEnd());
+    }
+}
+
+internal sealed class HeartbeatSession : IDisposable
+{
+    private readonly Timer _timer;
+    private string _phase = "Starting";
+    private string _detail = "Initializing";
+
+    public HeartbeatSession()
+    {
+        _timer = new Timer(OnTick, state: null, dueTime: TimeSpan.Zero, period: TimeSpan.FromSeconds(3));
+    }
+
+    public void UpdatePhase(string phase, string detail)
+    {
+        _phase = phase;
+        _detail = detail;
+        Emit("phase");
+    }
+
+    public void Dispose()
+    {
+        _timer.Dispose();
+    }
+
+    private void OnTick(object? state) => Emit("alive");
+
+    private void Emit(string state)
+    {
+        var timestamp = DateTimeOffset.UtcNow.ToString("O");
+        Console.Error.WriteLine($"HB|{timestamp}|{state}|{_phase}|{_detail}");
     }
 }
 

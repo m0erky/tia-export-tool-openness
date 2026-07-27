@@ -178,6 +178,17 @@
                                    Text="{Binding HealthCheckStatusText}" />
                     </StackPanel>
 
+                    <StackPanel Margin="0,8,0,0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Ellipse Width="12"
+                                 Height="12"
+                                 Margin="0,0,8,0"
+                                 Fill="{Binding HostActivityIndicatorBrush}" />
+                        <TextBlock Foreground="#52624D"
+                                   Text="{Binding HostActivityStatusText}" />
+                    </StackPanel>
+
                     <TextBlock Margin="0,18,0,6"
                                FontSize="18"
                                FontWeight="SemiBold"

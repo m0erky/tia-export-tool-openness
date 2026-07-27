@@ -3,6 +3,7 @@ using System.Text;
 using System.IO;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Threading;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Application.Services;
 using TiaProjectExporter.Core.Models;
@@ -45,8 +46,12 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _tiaInstallationValidationText = "Manual TIA installation override is optional.";
     private string _healthCheckStatusText = "Health check not executed yet.";
     private string _healthCheckIndicatorBrush = "#6B7280";
+    private string _hostActivityStatusText = "No host heartbeat received yet.";
+    private string _hostActivityIndicatorBrush = "#6B7280";
+    private DateTimeOffset? _lastHostHeartbeatUtc;
     private bool _isExporting;
     private CancellationTokenSource? _exportCancellationTokenSource;
+    private readonly DispatcherTimer _hostHeartbeatTimer;
 
     private static readonly string AppVersion = ResolveAppVersion();
 
@@ -84,6 +89,9 @@ public sealed class MainWindowViewModel : ObservableObject
         CancelExportCommand = new AsyncRelayCommand(CancelExportAsync, CanCancelExport, HandleCommandExceptionAsync);
 
         logCollector.EntryAdded += OnLogEntryAdded;
+
+        _hostHeartbeatTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, OnHostHeartbeatTimerTick, Dispatcher.CurrentDispatcher);
+        _hostHeartbeatTimer.Start();
 
         LoadPersistedSettings();
     }
@@ -202,6 +210,24 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         get => _healthCheckIndicatorBrush;
         set => SetProperty(ref _healthCheckIndicatorBrush, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the host-runtime liveness status text derived from heartbeats.
+    /// </summary>
+    public string HostActivityStatusText
+    {
+        get => _hostActivityStatusText;
+        set => SetProperty(ref _hostActivityStatusText, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the host-runtime liveness indicator brush.
+    /// </summary>
+    public string HostActivityIndicatorBrush
+    {
+        get => _hostActivityIndicatorBrush;
+        set => SetProperty(ref _hostActivityIndicatorBrush, value);
     }
 
     /// <summary>
@@ -573,6 +599,9 @@ public sealed class MainWindowViewModel : ObservableObject
         StatusText = "Running export";
         ProgressText = "Preparing repository export";
         CurrentObject = "Initializing";
+        _lastHostHeartbeatUtc = null;
+        HostActivityIndicatorBrush = "#F59E0B";
+        HostActivityStatusText = "Waiting for first host heartbeat...";
         ProgressPercent = 0;
         SucceededCount = 0;
         FailedCount = 0;
@@ -635,6 +664,12 @@ public sealed class MainWindowViewModel : ObservableObject
             await SavePersistedSettingsAsync(CancellationToken.None);
             _exportCancellationTokenSource = null;
             IsExporting = false;
+
+            if (_lastHostHeartbeatUtc is not null)
+            {
+                HostActivityIndicatorBrush = "#6B7280";
+                HostActivityStatusText = "Host heartbeat monitoring idle.";
+            }
         }
     }
 
@@ -864,7 +899,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.8";
+            return "0.0.9";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
@@ -881,6 +916,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
         dispatcher.Invoke(() =>
         {
+            TryTrackHostHeartbeat(entry);
+
             LogEntries.Add(entry);
 
             while (LogEntries.Count > 500)
@@ -888,6 +925,64 @@ public sealed class MainWindowViewModel : ObservableObject
                 LogEntries.RemoveAt(0);
             }
         });
+    }
+
+    private void TryTrackHostHeartbeat(string entry)
+    {
+        var markerIndex = entry.IndexOf("HostHeartbeat|", StringComparison.Ordinal);
+
+        if (markerIndex < 0)
+        {
+            return;
+        }
+
+        var payload = entry[(markerIndex + "HostHeartbeat|".Length)..];
+        var parts = payload.Split('|');
+
+        if (parts.Length < 4)
+        {
+            return;
+        }
+
+        if (DateTimeOffset.TryParse(parts[0], out var timestamp))
+        {
+            _lastHostHeartbeatUtc = timestamp;
+        }
+    }
+
+    private void OnHostHeartbeatTimerTick(object? sender, EventArgs e)
+    {
+        if (!IsExporting)
+        {
+            return;
+        }
+
+        if (_lastHostHeartbeatUtc is null)
+        {
+            HostActivityIndicatorBrush = "#F59E0B";
+            HostActivityStatusText = "Waiting for first host heartbeat...";
+            return;
+        }
+
+        var age = DateTimeOffset.UtcNow - _lastHostHeartbeatUtc.Value;
+        var ageSeconds = (int)Math.Max(0, age.TotalSeconds);
+
+        if (ageSeconds <= 15)
+        {
+            HostActivityIndicatorBrush = "#16A34A";
+            HostActivityStatusText = $"Host active (last heartbeat {ageSeconds}s ago).";
+            return;
+        }
+
+        if (ageSeconds <= 60)
+        {
+            HostActivityIndicatorBrush = "#F59E0B";
+            HostActivityStatusText = $"Host heartbeat delayed ({ageSeconds}s).";
+            return;
+        }
+
+        HostActivityIndicatorBrush = "#DC2626";
+        HostActivityStatusText = $"No host heartbeat for {ageSeconds}s. Consider cancel/retry if this persists.";
     }
 
     private async Task<string?> WriteFailureDiagnosticsAsync(Exception exception, CancellationToken cancellationToken)
