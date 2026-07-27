@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace TiaProjectExporter.OpennessHost;
@@ -12,6 +13,7 @@ namespace TiaProjectExporter.OpennessHost;
 internal static class Program
 {
     private const int MaxTraversalDepth = 6;
+    private const int MaxPlcTraversalDepth = 10;
     private const int MaxChildrenPerNode = 2000;
     private const int MaxItemsPerEnumerableProperty = 1000;
     private static readonly TimeSpan SlowPropertyThreshold = TimeSpan.FromSeconds(2);
@@ -417,6 +419,7 @@ internal static class Program
 
             deviceCount++;
             TraverseSoftwareGraph(device, devicePath, objects, issues);
+            TraversePlcFocusedGraph(device, devicePath, objects, issues);
         }
 
         if (deviceCount == 0)
@@ -518,6 +521,210 @@ internal static class Program
                 Message = "No software-level objects discovered during traversal.",
                 Details = "Host reflection walk found no child nodes beyond device root."
             });
+        }
+    }
+
+    private static void TraversePlcFocusedGraph(object deviceRoot, string devicePath, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
+    {
+        var entryPoints = ResolvePlcEntryPoints(deviceRoot, devicePath, issues).ToArray();
+
+        if (entryPoints.Length == 0)
+        {
+            return;
+        }
+
+        _heartbeatSession?.UpdatePhase("TraversePlc", $"Device root: {devicePath}");
+
+        var queue = new Queue<(object Node, string Path, int Depth)>();
+        foreach (var entry in entryPoints)
+        {
+            queue.Enqueue((entry.Node, entry.Path, 1));
+        }
+
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+
+            if (current.Depth > MaxPlcTraversalDepth)
+            {
+                continue;
+            }
+
+            _heartbeatSession?.UpdatePhase("TraversePlcQueue", $"{current.Path} (depth {current.Depth})");
+
+            var childrenAdded = 0;
+
+            foreach (var child in EnumeratePlcChildObjects(current.Node, current.Path, issues))
+            {
+                if (childrenAdded >= MaxChildrenPerNode)
+                {
+                    issues.Add(new HostIssue
+                    {
+                        Scope = "OpennessTraversal",
+                        Message = "PLC traversal node child limit reached; remaining children were skipped.",
+                        Details = $"Node: {current.Path}; Limit: {MaxChildrenPerNode}"
+                    });
+                    break;
+                }
+
+                var childName = TryReadString(child, "Name") ?? TryReadString(child, "DisplayName") ?? child.GetType().Name;
+                var childPath = $"{current.Path}/{childName}";
+                var objectType = ClassifyPlcObjectType(child, childPath);
+                var dedupKey = $"{objectType}|{childPath}";
+
+                if (!visited.Add(dedupKey))
+                {
+                    continue;
+                }
+
+                if (!ContainsRuntimePathData(childPath, objectType))
+                {
+                    continue;
+                }
+
+                objects.Add(new HostObjectNode
+                {
+                    ObjectType = objectType,
+                    Name = childName,
+                    QualifiedPath = childPath,
+                    Depth = current.Depth + 1,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["RuntimeType"] = child.GetType().FullName ?? child.GetType().Name,
+                        ["ExtractionStrategy"] = "HostReflectionPlcFocus"
+                    }
+                });
+
+                childrenAdded++;
+                queue.Enqueue((child, childPath, current.Depth + 1));
+            }
+        }
+    }
+
+    private static IEnumerable<(object Node, string Path)> ResolvePlcEntryPoints(object deviceRoot, string devicePath, ICollection<HostIssue> issues)
+    {
+        foreach (var property in deviceRoot.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!property.CanRead || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            var propertyTypeName = property.PropertyType.FullName ?? property.PropertyType.Name;
+            var candidate = $"{property.Name} {propertyTypeName}";
+
+            if (!ContainsAny(candidate, "Software", "Plc", "Program"))
+            {
+                continue;
+            }
+
+            object? value;
+            try
+            {
+                value = property.GetValue(deviceRoot);
+            }
+            catch (Exception exception)
+            {
+                issues.Add(new HostIssue
+                {
+                    Scope = "OpennessTraversal",
+                    Message = "Skipping PLC entry property because value retrieval failed.",
+                    Details = $"Node: {devicePath}; Property: {property.Name}; {DescribeException(exception)}"
+                });
+                continue;
+            }
+
+            if (value is null)
+            {
+                continue;
+            }
+
+            if (value is IEnumerable enumerable && value is not string)
+            {
+                foreach (var item in enumerable)
+                {
+                    if (item is null || IsSimpleValue(item.GetType()))
+                    {
+                        continue;
+                    }
+
+                    yield return (item, $"{devicePath}/{property.Name}");
+                }
+
+                continue;
+            }
+
+            if (IsSimpleValue(value.GetType()))
+            {
+                continue;
+            }
+
+            yield return (value, $"{devicePath}/{property.Name}");
+        }
+    }
+
+    private static IEnumerable<object> EnumeratePlcChildObjects(object parent, string parentPath, ICollection<HostIssue> issues)
+    {
+        var properties = parent.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+        foreach (var property in properties)
+        {
+            if (!property.CanRead || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            if (!IsPlcCandidateProperty(property) || ShouldSkipProperty(property))
+            {
+                continue;
+            }
+
+            object? value;
+            try
+            {
+                value = property.GetValue(parent);
+            }
+            catch (Exception exception)
+            {
+                issues.Add(new HostIssue
+                {
+                    Scope = "OpennessTraversal",
+                    Message = "Skipping PLC property because value retrieval failed.",
+                    Details = $"Node: {parentPath}; Property: {property.Name}; {DescribeException(exception)}"
+                });
+                continue;
+            }
+
+            if (value is null || IsSimpleValue(value.GetType()))
+            {
+                continue;
+            }
+
+            if (value is IEnumerable enumerable && value is not string)
+            {
+                var itemCount = 0;
+                foreach (var item in enumerable)
+                {
+                    itemCount++;
+                    if (itemCount > MaxItemsPerEnumerableProperty)
+                    {
+                        break;
+                    }
+
+                    if (item is null || IsSimpleValue(item.GetType()))
+                    {
+                        continue;
+                    }
+
+                    yield return item;
+                }
+
+                continue;
+            }
+
+            yield return value;
         }
     }
 
@@ -670,6 +877,16 @@ internal static class Program
         return typeof(IEnumerable).IsAssignableFrom(property.PropertyType) && typeName.Contains("Siemens.Engineering", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsPlcCandidateProperty(PropertyInfo property)
+    {
+        var typeName = property.PropertyType.FullName ?? property.PropertyType.Name;
+        var candidate = $"{property.Name} {typeName}";
+
+        return ContainsAny(candidate,
+            "Software", "Plc", "Block", "BlockGroup", "Group", "Tag", "TagTable", "DataType", "UDT", "Type", "UserType",
+            "Source", "ExternalSource", "Technology", "Motion", "Pid", "Safety", "CompileUnit", "Network");
+    }
+
     private static bool ShouldSkipProperty(PropertyInfo property)
     {
         var candidate = $"{property.Name} {property.PropertyType.FullName}";
@@ -747,6 +964,79 @@ internal static class Program
         }
 
         return "UnmappedRuntimeNode";
+    }
+
+    private static string ClassifyPlcObjectType(object runtimeNode, string qualifiedPath)
+    {
+        var runtimeTypeFullName = runtimeNode.GetType().FullName ?? runtimeNode.GetType().Name;
+        var runtimeTypeName = runtimeNode.GetType().Name;
+        var nodeName = TryReadString(runtimeNode, "Name") ?? TryReadString(runtimeNode, "DisplayName") ?? runtimeTypeName;
+        var candidate = $"{runtimeTypeFullName} {runtimeTypeName} {nodeName} {qualifiedPath}";
+
+        if (ContainsAny(candidate, ".SW.Blocks.OB", "OrganizationBlock") || Regex.IsMatch(nodeName, "^OB\\d+", RegexOptions.IgnoreCase))
+        {
+            return "OB";
+        }
+
+        if (ContainsAny(candidate, ".SW.Blocks.FB", "FunctionBlock") || Regex.IsMatch(nodeName, "^FB\\d+", RegexOptions.IgnoreCase))
+        {
+            return "FB";
+        }
+
+        if (ContainsAny(candidate, ".SW.Blocks.FC", "Function") || Regex.IsMatch(nodeName, "^FC\\d+", RegexOptions.IgnoreCase))
+        {
+            return "FC";
+        }
+
+        if (ContainsAny(candidate, "InstanceDataBlock", "InstanceDB", "InstanceDb") || Regex.IsMatch(nodeName, "^IDB\\d+", RegexOptions.IgnoreCase))
+        {
+            return "InstanceDB";
+        }
+
+        if (ContainsAny(candidate, ".SW.Blocks.DB", "DataBlock") || Regex.IsMatch(nodeName, "^DB\\d+", RegexOptions.IgnoreCase))
+        {
+            return "DB";
+        }
+
+        if (ContainsAny(candidate, "TagTable"))
+        {
+            return "TagTable";
+        }
+
+        if (ContainsAny(candidate, "PlcTag", "Tag"))
+        {
+            return "Tag";
+        }
+
+        if (ContainsAny(candidate, "UserDataType", "UDT", "DataType"))
+        {
+            return "UDT";
+        }
+
+        if (ContainsAny(candidate, "Technology", "Motion", "Pid", "Safety"))
+        {
+            return "TechnologyObject";
+        }
+
+        if (ContainsAny(candidate, "Source", "ExternalSource"))
+        {
+            return "Source";
+        }
+
+        return ClassifyObjectType(runtimeTypeName, qualifiedPath);
+    }
+
+    private static bool ContainsRuntimePathData(string path, string objectType)
+    {
+        if (objectType is "OB" or "FB" or "FC" or "DB" or "InstanceDB" or "Tag" or "TagTable" or "UDT" or "TechnologyObject" or "Source")
+        {
+            return true;
+        }
+
+        return path.Contains("Software", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("Blocks", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("Tag", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("DataType", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool ContainsAny(string candidate, params string[] terms) =>

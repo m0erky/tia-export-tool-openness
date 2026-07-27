@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.21**
+Version baseline for this milestone: **0.0.22**
 
 Scope:
 
@@ -253,6 +253,9 @@ Scope:
 - Fixed UI→host build orchestration so the net48 `TiaProjectExporter.OpennessHost` build does not inherit `win-x64` runtime settings from UI publish/build; resolves `NETSDK1047` (`net48/win-x64`) during Windows publish.
 - Documented optional `TiaPortalLocation` publish property for Siemens PublicAPI reference resolution warnings.
 - Incremented application version to `0.0.21` in central build metadata and UI fallback version resolution.
+- Added dedicated PLC-focused host traversal pass that explicitly targets software/block/tag/datatype candidate properties to improve runtime discovery of PLC assets beyond generic hardware graph traversal.
+- Added PLC-aware object classification in host (`OB`, `FB`, `FC`, `DB`, `InstanceDB`, `Tag`, `TagTable`, `UDT`, `TechnologyObject`, `Source`) to improve downstream domain routing and export usefulness.
+- Incremented application version to `0.0.22` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
