@@ -192,18 +192,22 @@ public sealed class InventoryObjectExportStage : IExportStage
 
     private static object BuildSerializableNode(TiaProjectObjectNode node)
     {
+        var compactMetadata = BuildCompactMetadata(node.Metadata);
+
         return new
         {
             node.ObjectType,
             node.Name,
             node.QualifiedPath,
             node.Depth,
-            Metadata = node.Metadata ?? new Dictionary<string, string>()
+            Metadata = compactMetadata
         };
     }
 
     private static string BuildNodeXml(TiaProjectObjectNode node)
     {
+        var compactMetadata = BuildCompactMetadata(node.Metadata);
+
         var document = new XDocument(
             new XElement(
                 "TiaProjectObject",
@@ -213,7 +217,7 @@ public sealed class InventoryObjectExportStage : IExportStage
                 new XElement("QualifiedPath", node.QualifiedPath),
                 new XElement(
                     "Metadata",
-                    (node.Metadata ?? new Dictionary<string, string>()).Select(pair =>
+                    compactMetadata.Select(pair =>
                         new XElement("Entry", new XAttribute("key", pair.Key), pair.Value)))));
 
         return document.ToString();
@@ -229,7 +233,7 @@ public sealed class InventoryObjectExportStage : IExportStage
         builder.AppendLine($"- Depth: **{node.Depth}**");
         builder.AppendLine();
 
-        var metadata = node.Metadata ?? new Dictionary<string, string>();
+        var metadata = BuildCompactMetadata(node.Metadata);
 
         if (metadata.Count == 0)
         {
@@ -246,6 +250,30 @@ public sealed class InventoryObjectExportStage : IExportStage
         }
 
         return builder.ToString();
+    }
+
+    private static Dictionary<string, string> BuildCompactMetadata(IReadOnlyDictionary<string, string>? metadata)
+    {
+        var source = metadata ?? new Dictionary<string, string>();
+        var compact = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var pair in source)
+        {
+            if (pair.Key.StartsWith("Prop.", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (pair.Key.StartsWith("Content.", StringComparison.OrdinalIgnoreCase)
+                && pair.Key is not "Content.ExportXmlLength" and not "Content.SourceTextLength")
+            {
+                continue;
+            }
+
+            compact[pair.Key] = pair.Value;
+        }
+
+        return compact;
     }
 
     private static async Task WriteDeepContentArtifactsAsync(

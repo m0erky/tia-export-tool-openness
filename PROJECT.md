@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.27**
+Version baseline for this milestone: **0.0.28**
 
 Scope:
 
@@ -272,6 +272,8 @@ Scope:
 - Incremented application version to `0.0.26` in central build metadata and UI fallback version resolution.
 - Fixed net48 compatibility regressions in `TiaProjectExporter.OpennessHost` by removing `Index/Range` syntax and adjusting reflection argument typing (`object[]`) for `Export(...)` invocation.
 - Incremented application version to `0.0.27` in central build metadata and UI fallback version resolution.
+- Switched inventory object serialization to content-first compact metadata: removed noisy `Prop.*` and raw `Content.*` payloads from primary JSON/XML/Markdown object files while keeping deep-content sidecar artifacts.
+- Incremented application version to `0.0.28` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
