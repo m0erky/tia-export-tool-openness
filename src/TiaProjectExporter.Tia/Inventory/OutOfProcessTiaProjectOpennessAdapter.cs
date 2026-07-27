@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Core.Models;
@@ -143,7 +144,84 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
             Name: string.IsNullOrWhiteSpace(node.Name) ? "Unnamed" : node.Name,
             QualifiedPath: string.IsNullOrWhiteSpace(node.QualifiedPath) ? "Project/Unknown" : node.QualifiedPath,
             Depth: node.Depth,
-            Metadata: node.Metadata ?? new Dictionary<string, string>());
+            Metadata: ParseMetadata(node.Metadata));
+
+    private static Dictionary<string, string> ParseMetadata(JsonElement metadata)
+    {
+        if (metadata.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (metadata.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in metadata.EnumerateObject())
+            {
+                result[property.Name] = ConvertJsonValueToString(property.Value);
+            }
+
+            return result;
+        }
+
+        if (metadata.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in metadata.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                if (!TryResolveDictionaryEntry(item, out var key, out var value))
+                {
+                    continue;
+                }
+
+                result[key] = value;
+            }
+
+            return result;
+        }
+
+        result["Value"] = ConvertJsonValueToString(metadata);
+        return result;
+    }
+
+    private static bool TryResolveDictionaryEntry(JsonElement entry, out string key, out string value)
+    {
+        key = string.Empty;
+        value = string.Empty;
+
+        if (entry.TryGetProperty("Key", out var keyElement) && entry.TryGetProperty("Value", out var valueElement))
+        {
+            key = ConvertJsonValueToString(keyElement);
+            value = ConvertJsonValueToString(valueElement);
+            return !string.IsNullOrWhiteSpace(key);
+        }
+
+        if (entry.TryGetProperty("key", out keyElement) && entry.TryGetProperty("value", out valueElement))
+        {
+            key = ConvertJsonValueToString(keyElement);
+            value = ConvertJsonValueToString(valueElement);
+            return !string.IsNullOrWhiteSpace(key);
+        }
+
+        return false;
+    }
+
+    private static string ConvertJsonValueToString(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString() ?? string.Empty,
+            JsonValueKind.True => bool.TrueString,
+            JsonValueKind.False => bool.FalseString,
+            JsonValueKind.Null or JsonValueKind.Undefined => string.Empty,
+            _ => value.GetRawText()
+        };
+    }
 
     private static DiscoveredTiaPortalInstallation? ResolvePreferredInstallation(
         IReadOnlyList<DiscoveredTiaPortalInstallation> discoveredInstallations,
@@ -350,7 +428,8 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
 
         public int Depth { get; set; }
 
-        public Dictionary<string, string>? Metadata { get; set; }
+        [JsonPropertyName("metadata")]
+        public JsonElement Metadata { get; set; }
     }
 
     private sealed class HostIssue
