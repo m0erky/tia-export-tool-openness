@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.12**
+Version baseline for this milestone: **0.0.13**
 
 Scope:
 
@@ -230,6 +230,8 @@ Scope:
 - Incremented application version to `0.0.11` in central build metadata and UI fallback version resolution.
 - Replaced floating central Siemens package version (`20.*`) with fixed version `20.0.1744193700` to satisfy NuGet central package management constraints (`NU1011`).
 - Incremented application version to `0.0.12` in central build metadata and UI fallback version resolution.
+- Suppressed `NU1603` only in `TiaProjectExporter.OpennessHost.csproj` because Siemens transitive lower-bound package versions are unavailable on public `nuget.org`, while NuGet resolves compatible higher versions.
+- Incremented application version to `0.0.13` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
@@ -245,6 +247,7 @@ Scope:
 - Linux-based automated test environment still cannot validate WPF runtime crash-path handling; verify new diagnostics files on Windows runtime failures.
 - Out-of-process host is currently .NET Framework 4.8 only and requires appropriate runtime/tooling on Windows build and execution hosts.
 - Siemens NuGet package restore for the host now depends on access to `nuget.org` (or an internal mirrored feed) during restore/build.
+- Siemens feed variability can produce transitive lower-bound resolution warnings (`NU1603`) for Openness packages; this is locally suppressed in host project to keep strict warnings-as-errors across the rest of the solution.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.

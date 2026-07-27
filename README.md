@@ -74,7 +74,9 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.12`
+- Current application version: `0.0.13`
+
+- `TiaProjectExporter.OpennessHost` suppresses `NU1603` locally because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
