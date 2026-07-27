@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.24**
+Version baseline for this milestone: **0.0.25**
 
 Scope:
 
@@ -262,6 +262,12 @@ Scope:
 - Added Siemens service-based PLC entry-point probing (`GetService(...)` with software-container candidates) in host traversal so PLC software trees can be discovered even when not surfaced as direct object properties.
 - Added bounded service-probe breadth/depth with heartbeat phase reporting (`TraversePlcServiceProbe`) to keep diagnostics clear during PLC discovery.
 - Incremented application version to `0.0.24` in central build metadata and UI fallback version resolution.
+- Added deep-content extraction in host traversal for software/runtime nodes:
+  - attempts reflective `Export(FileInfo|string)` and captures returned XML content as `Content.ExportXml`
+  - probes source-like properties (`Source`, `Text`, `Code`, `SclSource`, `ExternalSource`) as `Content.SourceText`
+- Extended object export stage to emit deep-content sidecar files per object (`*.content.export.xml`, `*.content.source.md|txt`).
+- Added test coverage updates for deep-content sidecar artifact generation.
+- Incremented application version to `0.0.25` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

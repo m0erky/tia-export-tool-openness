@@ -62,6 +62,8 @@ public sealed class InventoryObjectExportStage : IExportStage
                     cancellationToken).ConfigureAwait(false);
             }
 
+            await WriteDeepContentArtifactsAsync(context, node, relativeBasePath, cancellationToken).ConfigureAwait(false);
+
             exportedCount++;
         }
 
@@ -195,6 +197,55 @@ public sealed class InventoryObjectExportStage : IExportStage
             builder.AppendLine($"- {pair.Key}: `{pair.Value}`");
         }
 
+        return builder.ToString();
+    }
+
+    private static async Task WriteDeepContentArtifactsAsync(
+        ExportExecutionContext context,
+        TiaProjectObjectNode node,
+        string relativeBasePath,
+        CancellationToken cancellationToken)
+    {
+        var metadata = node.Metadata ?? new Dictionary<string, string>();
+
+        if (metadata.TryGetValue("Content.ExportXml", out var exportXml)
+            && !string.IsNullOrWhiteSpace(exportXml)
+            && context.Options.Formats.Contains(ExportFormat.Xml))
+        {
+            await context.WriteArtifactAsync(
+                new ExportArtifact($"{relativeBasePath}.content.export.xml", ExportFormat.Xml, exportXml),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (metadata.TryGetValue("Content.SourceText", out var sourceText)
+            && !string.IsNullOrWhiteSpace(sourceText))
+        {
+            var format = context.Options.Formats.Contains(ExportFormat.Markdown)
+                ? ExportFormat.Markdown
+                : ExportFormat.Json;
+
+            var wrappedSource = format == ExportFormat.Markdown
+                ? BuildSourceMarkdown(node, sourceText)
+                : sourceText;
+
+            var extension = format == ExportFormat.Markdown ? "md" : "txt";
+            await context.WriteArtifactAsync(
+                new ExportArtifact($"{relativeBasePath}.content.source.{extension}", format, wrappedSource),
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static string BuildSourceMarkdown(TiaProjectObjectNode node, string sourceText)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"# Source - {node.Name}");
+        builder.AppendLine();
+        builder.AppendLine($"Type: **{node.ObjectType}**");
+        builder.AppendLine($"Path: `{node.QualifiedPath}`");
+        builder.AppendLine();
+        builder.AppendLine("```text");
+        builder.AppendLine(sourceText);
+        builder.AppendLine("```");
         return builder.ToString();
     }
 

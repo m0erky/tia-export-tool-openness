@@ -29,11 +29,15 @@ public sealed class InventoryObjectExportStageTests
                     Depth: 1,
                     Metadata: new Dictionary<string, string> { ["RuntimeType"] = "DeviceType" }),
                 new TiaProjectObjectNode(
-                    ObjectType: "HmiObject",
-                    Name: "MainScreen",
-                    QualifiedPath: "Project/HMI/Screens/MainScreen",
+                    ObjectType: "FB",
+                    Name: "FB100",
+                    QualifiedPath: "Project/Devices/PLC_1/Software/Blocks/FB100",
                     Depth: 2,
-                    Metadata: new Dictionary<string, string>())
+                    Metadata: new Dictionary<string, string>
+                    {
+                        ["Content.ExportXml"] = "<FB />",
+                        ["Content.SourceText"] = "FUNCTION_BLOCK FB100"
+                    })
             ],
             Issues: Array.Empty<ExportIssue>()));
 
@@ -42,7 +46,9 @@ public sealed class InventoryObjectExportStageTests
         await stage.ExecuteAsync(context, CancellationToken.None);
 
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.StartsWith("Export/Hardware/Objects/", StringComparison.Ordinal) && artifact.RelativePath.EndsWith(".json", StringComparison.Ordinal));
-        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.StartsWith("Export/HMI/Objects/", StringComparison.Ordinal) && artifact.RelativePath.EndsWith(".md", StringComparison.Ordinal));
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.StartsWith("Export/Blocks/Objects/", StringComparison.Ordinal) && artifact.RelativePath.EndsWith(".md", StringComparison.Ordinal));
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.Contains(".content.export.xml", StringComparison.Ordinal));
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.Contains(".content.source.", StringComparison.Ordinal));
 
         var result = Assert.Single(context.Results, item => item.ObjectType == "InventoryObjects");
         Assert.Equal(ExportObjectStatus.Succeeded, result.Status);

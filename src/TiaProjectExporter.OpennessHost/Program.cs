@@ -589,6 +589,8 @@ internal static class Program
                     Metadata = BuildNodeMetadata(child, "HostReflectionPlcFocus", childPath, issues)
                 });
 
+                EnrichWithDeepContent(child, objectType, childPath, objects[^1].Metadata, issues);
+
                 childrenAdded++;
                 queue.Enqueue((child, childPath, current.Depth + 1));
             }
@@ -1129,6 +1131,169 @@ internal static class Program
 
         return IsSimpleValue(propertyType)
             || (Nullable.GetUnderlyingType(propertyType) is Type underlying && IsSimpleValue(underlying));
+    }
+
+    private static void EnrichWithDeepContent(
+        object runtimeNode,
+        string objectType,
+        string qualifiedPath,
+        Dictionary<string, string> metadata,
+        ICollection<HostIssue> issues)
+    {
+        if (!ShouldExtractDeepContent(objectType, qualifiedPath))
+        {
+            return;
+        }
+
+        if (TryExportNodeToXml(runtimeNode, out var exportedXml, out var exportError))
+        {
+            metadata["Content.ExportXml"] = exportedXml;
+            metadata["Content.ExportXmlLength"] = exportedXml.Length.ToString();
+        }
+        else if (!string.IsNullOrWhiteSpace(exportError))
+        {
+            issues.Add(new HostIssue
+            {
+                Scope = "OpennessTraversal",
+                Message = "Deep export XML extraction failed for runtime node.",
+                Details = $"Node: {qualifiedPath}; ObjectType: {objectType}; {exportError}"
+            });
+        }
+
+        if (TryExtractSourceText(runtimeNode, out var sourceText))
+        {
+            metadata["Content.SourceText"] = sourceText;
+            metadata["Content.SourceTextLength"] = sourceText.Length.ToString();
+        }
+    }
+
+    private static bool ShouldExtractDeepContent(string objectType, string qualifiedPath)
+    {
+        if (objectType is "OB" or "FB" or "FC" or "DB" or "InstanceDB" or "Tag" or "TagTable" or "UDT" or "TechnologyObject" or "Source")
+        {
+            return true;
+        }
+
+        return qualifiedPath.Contains("Software", StringComparison.OrdinalIgnoreCase)
+            || qualifiedPath.Contains("Blocks", StringComparison.OrdinalIgnoreCase)
+            || qualifiedPath.Contains("Tag", StringComparison.OrdinalIgnoreCase)
+            || qualifiedPath.Contains("DataType", StringComparison.OrdinalIgnoreCase)
+            || qualifiedPath.Contains("Technology", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryExportNodeToXml(object runtimeNode, out string xmlContent, out string? error)
+    {
+        xmlContent = string.Empty;
+        error = null;
+
+        var nodeType = runtimeNode.GetType();
+        var exportMethod = nodeType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(method =>
+            {
+                if (!string.Equals(method.Name, "Export", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                var parameters = method.GetParameters();
+                return parameters.Length == 1
+                    && (parameters[0].ParameterType == typeof(FileInfo)
+                        || parameters[0].ParameterType == typeof(string));
+            });
+
+        if (exportMethod is null)
+        {
+            return false;
+        }
+
+        var extension = ".xml";
+        var tempPath = Path.Combine(Path.GetTempPath(), $"tia-exporter-{Guid.NewGuid():N}{extension}");
+
+        try
+        {
+            var parameterType = exportMethod.GetParameters()[0].ParameterType;
+            var argument = parameterType == typeof(FileInfo)
+                ? new FileInfo(tempPath)
+                : tempPath;
+
+            _ = exportMethod.Invoke(runtimeNode, new[] { argument });
+
+            if (!File.Exists(tempPath))
+            {
+                error = "Export method executed but produced no output file.";
+                return false;
+            }
+
+            xmlContent = File.ReadAllText(tempPath);
+            return !string.IsNullOrWhiteSpace(xmlContent);
+        }
+        catch (Exception exception)
+        {
+            error = DescribeException(exception);
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+            }
+            catch
+            {
+                // Best effort cleanup only.
+            }
+        }
+    }
+
+    private static bool TryExtractSourceText(object runtimeNode, out string sourceText)
+    {
+        sourceText = string.Empty;
+
+        var candidates = new[]
+        {
+            "Source",
+            "Text",
+            "Code",
+            "StatementList",
+            "SclSource",
+            "ExternalSource"
+        };
+
+        foreach (var propertyName in candidates)
+        {
+            var property = runtimeNode.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+            if (property is null || !property.CanRead || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                var value = property.GetValue(runtimeNode);
+                if (value is null)
+                {
+                    continue;
+                }
+
+                var text = value.ToString();
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                sourceText = text;
+                return true;
+            }
+            catch
+            {
+                // Ignore and continue probing.
+            }
+        }
+
+        return false;
     }
 
     private static bool TryConvertScalarToString(object? value, out string serialized)
