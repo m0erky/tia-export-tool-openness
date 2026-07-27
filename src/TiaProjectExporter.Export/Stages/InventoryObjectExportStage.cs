@@ -97,6 +97,26 @@ public sealed class InventoryObjectExportStage : IExportStage
 
     private static string ResolveDomain(TiaProjectObjectNode node)
     {
+        if (IsBlockObjectType(node.ObjectType))
+        {
+            return "Blocks";
+        }
+
+        if (IsTagObjectType(node.ObjectType))
+        {
+            return "Tags";
+        }
+
+        if (IsUdtObjectType(node.ObjectType))
+        {
+            return "UDTs";
+        }
+
+        if (IsHmiObjectType(node.ObjectType))
+        {
+            return "HMI";
+        }
+
         var candidate = $"{node.ObjectType} {node.QualifiedPath} {node.Name}";
 
         if (ContainsAny(candidate, "Device", "Module", "Rack", "Hardware", "Cpu"))
@@ -141,6 +161,34 @@ public sealed class InventoryObjectExportStage : IExportStage
 
         return "Metadata";
     }
+
+    private static bool IsBlockObjectType(string objectType) =>
+        objectType.Equals("OB", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("FB", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("FC", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("DB", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("InstanceDB", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("Block", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("FunctionBlock", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("OrganizationBlock", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("DataBlock", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsTagObjectType(string objectType) =>
+        objectType.Equals("Tag", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("TagTable", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("PlcTag", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsUdtObjectType(string objectType) =>
+        objectType.Equals("UDT", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("DataType", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsHmiObjectType(string objectType) =>
+        objectType.Equals("HMI", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("HmiObject", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("Screen", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("Faceplate", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("Recipe", StringComparison.OrdinalIgnoreCase)
+        || objectType.Equals("Alarm", StringComparison.OrdinalIgnoreCase);
 
     private static object BuildSerializableNode(TiaProjectObjectNode node)
     {

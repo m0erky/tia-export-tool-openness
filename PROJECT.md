@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.25**
+Version baseline for this milestone: **0.0.26**
 
 Scope:
 
@@ -268,6 +268,8 @@ Scope:
 - Extended object export stage to emit deep-content sidecar files per object (`*.content.export.xml`, `*.content.source.md|txt`).
 - Added test coverage updates for deep-content sidecar artifact generation.
 - Incremented application version to `0.0.25` in central build metadata and UI fallback version resolution.
+- Fixed inventory object domain routing precedence to classify explicit PLC object types (`FB/FC/OB/DB/InstanceDB`, `Tag/TagTable`, `UDT`) by `ObjectType` before path keywords, preventing `Blocks` objects from being misrouted to `Hardware` when paths contain `Devices/...`.
+- Incremented application version to `0.0.26` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
