@@ -796,7 +796,7 @@ public sealed class MainWindowViewModel : ObservableObject
         && !string.IsNullOrWhiteSpace(OutputDirectory)
         && !string.IsNullOrWhiteSpace(ProjectPath)
         && _preScannedInventory is not null
-        && SelectableDomains.Any(item => item.IsSelected && item.ObjectCount > 0);
+        && SelectableDomains.Any(item => item.IsSelected);
 
     private bool CanScanProjectContents() =>
         !IsExporting
@@ -927,7 +927,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private IReadOnlyCollection<ExportDomain> BuildSelectedDomains()
     {
         return SelectableDomains
-            .Where(item => item.IsSelected && item.ObjectCount > 0)
+            .Where(item => item.IsSelected)
             .Select(item => item.Domain)
             .Distinct()
             .ToArray();
@@ -961,7 +961,7 @@ public sealed class MainWindowViewModel : ObservableObject
         foreach (var domain in Enum.GetValues<ExportDomain>().OrderBy(domain => domain.ToString()))
         {
             var count = counts.TryGetValue(domain, out var value) ? value : 0;
-            var selection = new ExportDomainSelectionItem(domain, count, count > 0);
+            var selection = new ExportDomainSelectionItem(domain, count, isSelected: true);
             selection.PropertyChanged += OnDomainSelectionChanged;
             SelectableDomains.Add(selection);
         }
@@ -1052,7 +1052,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.40";
+            return "0.0.41";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";

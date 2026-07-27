@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.40**
+Version baseline for this milestone: **0.0.41**
 
 Scope:
 
@@ -321,6 +321,11 @@ Scope:
 - Incremented application version to `0.0.39` in central build metadata and UI fallback version resolution.
 - Updated test stub implementations of `ITiaProjectInventoryProvider` to implement the new preview method contract (`BuildInventoryPreviewAsync`) and restore test compilation.
 - Incremented application version to `0.0.40` in central build metadata and UI fallback version resolution.
+- Fixed selective-export false-negative behavior when preview scan under-detects domains (for example Blocks):
+  - all domains are now selected by default after scan
+  - selected-domain export filter no longer requires preview object count > 0
+  - export start condition requires any selected domain (not selected+count)
+- Incremented application version to `0.0.41` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 
