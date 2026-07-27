@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.11**
+Version baseline for this milestone: **0.0.12**
 
 Scope:
 
@@ -225,9 +225,11 @@ Scope:
 - Incremented application version to `0.0.9` in central build metadata and UI fallback version resolution.
 - Added persistent out-of-process host stderr transcript logging under `%LocalAppData%/TiaProjectExporter/HostLogs` for post-mortem diagnostics even when UI logs are sparse.
 - Incremented application version to `0.0.10` in central build metadata and UI fallback version resolution.
-- Integrated Siemens `Siemens.Collaboration.Net.TiaPortal.Openness.Extensions` (`20.*`) into the net48 out-of-process host to use Siemens-standard resolver initialization before first Openness access.
+- Integrated Siemens `Siemens.Collaboration.Net.TiaPortal.Openness.Extensions` (`20.0.1744193700`) into the net48 out-of-process host to use Siemens-standard resolver initialization before first Openness access.
 - Added robust resolver bootstrap in `TiaProjectExporter.OpennessHost` (`Api.Global().Openness().Initialize()` via reflection), with explicit diagnostic messages and fallback to manual assembly loading.
 - Incremented application version to `0.0.11` in central build metadata and UI fallback version resolution.
+- Replaced floating central Siemens package version (`20.*`) with fixed version `20.0.1744193700` to satisfy NuGet central package management constraints (`NU1011`).
+- Incremented application version to `0.0.12` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
@@ -306,7 +308,7 @@ Windows-specific notes:
 
 - The UI project targets WPF and should be built on Windows with the .NET 8 SDK and Windows Desktop workload available.
 - TIA Openness integration requires Siemens TIA Portal installations and compatible Openness assemblies for V18/V19/V20.
-- Restore/build now also requires access to Siemens NuGet packages (for `Siemens.Collaboration.Net.TiaPortal.Openness.Extensions` `20.*`) in `TiaProjectExporter.OpennessHost`; use `nuget.org` or a mirrored internal feed.
+- Restore/build now also requires access to Siemens NuGet packages (for `Siemens.Collaboration.Net.TiaPortal.Openness.Extensions` `20.0.1744193700`) in `TiaProjectExporter.OpennessHost`; use `nuget.org` or a mirrored internal feed.
 - Linux verification command used successfully in this workspace:
 
 ```bash
