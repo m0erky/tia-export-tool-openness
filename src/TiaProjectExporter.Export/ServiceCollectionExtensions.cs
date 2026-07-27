@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IExportStage, RepositoryLayoutStage>();
         services.AddSingleton<IExportStage, ProjectInventoryStage>();
+        services.AddSingleton<IExportStage, InventoryObjectExportStage>();
         services.AddSingleton<IExportStage, BlockCallGraphStage>();
         services.AddSingleton<IExportStage, DependencyGraphStage>();
         services.AddSingleton<IExportStage, RuntimeTypeCatalogStage>();
