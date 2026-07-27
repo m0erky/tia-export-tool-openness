@@ -44,7 +44,7 @@ public sealed class InventoryObjectExportStageTests
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.StartsWith("Export/Hardware/Objects/", StringComparison.Ordinal) && artifact.RelativePath.EndsWith(".json", StringComparison.Ordinal));
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.StartsWith("Export/HMI/Objects/", StringComparison.Ordinal) && artifact.RelativePath.EndsWith(".md", StringComparison.Ordinal));
 
-        var result = Assert.Single(context.Results, item => item.Scope == "InventoryObjects");
+        var result = Assert.Single(context.Results, item => item.ObjectType == "InventoryObjects");
         Assert.Equal(ExportObjectStatus.Succeeded, result.Status);
     }
 
