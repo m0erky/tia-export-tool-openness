@@ -34,6 +34,7 @@ public sealed class ExportCoordinatorTests
         var report = await coordinator.ExecuteAsync(
             ExportOptions.CreateDefault("out"),
             progressCallback: null,
+            preloadedInventory: null,
             CancellationToken.None);
 
         Assert.Equal(5, report.Results.Count);
@@ -64,6 +65,7 @@ public sealed class ExportCoordinatorTests
                 progressUpdates.Add(update);
                 return Task.CompletedTask;
             },
+            preloadedInventory: null,
             CancellationToken.None);
 
         Assert.Contains(progressUpdates, update => update.CurrentObject == "Object A");

@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.36**
+Version baseline for this milestone: **0.0.37**
 
 Scope:
 
@@ -307,6 +307,12 @@ Scope:
   - added "Jump to latest" action in log panel
   - log panel now auto-scrolls while at bottom and preserves manual inspection when user scrolls up
 - Incremented application version to `0.0.36` in central build metadata and UI fallback version resolution.
+- Implemented two-step selective export workflow in UI:
+  - added project pre-scan command (`Scan Project Contents`) using inventory provider
+  - added selectable export-domain list with discovered object counts
+  - export now requires completed pre-scan and at least one selected domain
+- Added domain classification utility in core and domain filter propagation through export options/stages.
+- Incremented application version to `0.0.37` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

@@ -24,6 +24,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly ITiaInstallationDiscoveryService _installationDiscoveryService;
     private readonly IOpennessHealthCheckService _opennessHealthCheckService;
     private readonly ExportCoordinator _exportCoordinator;
+    private readonly ITiaProjectInventoryProvider _inventoryProvider;
     private readonly IExporterSettingsStore _settingsStore;
     private readonly IFolderSelectionService _folderSelectionService;
     private readonly UiLogCollector _logCollector;
@@ -51,6 +52,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _hostActivityIndicatorBrush = "#6B7280";
     private DateTimeOffset? _lastHostHeartbeatUtc;
     private bool _isExporting;
+    private string _inventoryScanStatusText = "Run 'Scan Project Contents' before exporting.";
+    private TiaProjectInventory? _preScannedInventory;
     private CancellationTokenSource? _exportCancellationTokenSource;
     private readonly DispatcherTimer _hostHeartbeatTimer;
 
@@ -63,6 +66,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ITiaInstallationDiscoveryService installationDiscoveryService,
         IOpennessHealthCheckService opennessHealthCheckService,
         ExportCoordinator exportCoordinator,
+        ITiaProjectInventoryProvider inventoryProvider,
         ExporterSettings settings,
         IExporterSettingsStore settingsStore,
         IFolderSelectionService folderSelectionService,
@@ -71,6 +75,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _installationDiscoveryService = installationDiscoveryService;
         _opennessHealthCheckService = opennessHealthCheckService;
         _exportCoordinator = exportCoordinator;
+        _inventoryProvider = inventoryProvider;
         _settingsStore = settingsStore;
         _folderSelectionService = folderSelectionService;
         _logCollector = logCollector;
@@ -86,6 +91,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ValidateProjectPathCommand = new AsyncRelayCommand(ValidateProjectPathAsync, onExceptionAsync: HandleCommandExceptionAsync);
         BrowseTiaInstallationPathOverrideCommand = new AsyncRelayCommand(BrowseTiaInstallationPathOverrideAsync, onExceptionAsync: HandleCommandExceptionAsync);
         ValidateTiaInstallationPathOverrideCommand = new AsyncRelayCommand(ValidateTiaInstallationPathOverrideAsync, onExceptionAsync: HandleCommandExceptionAsync);
+        ScanProjectContentsCommand = new AsyncRelayCommand(ScanProjectContentsAsync, CanScanProjectContents, HandleCommandExceptionAsync);
         ExportCommand = new AsyncRelayCommand(ExportAsync, CanExport, HandleCommandExceptionAsync);
         CancelExportCommand = new AsyncRelayCommand(CancelExportAsync, CanCancelExport, HandleCommandExceptionAsync);
 
@@ -111,6 +117,11 @@ public sealed class MainWindowViewModel : ObservableObject
     /// Gets recent output directories used by the exporter.
     /// </summary>
     public ObservableCollection<string> RecentOutputDirectories { get; } = [];
+
+    /// <summary>
+    /// Gets selectable export domains discovered during pre-scan.
+    /// </summary>
+    public ObservableCollection<ExportDomainSelectionItem> SelectableDomains { get; } = [];
 
     /// <summary>
     /// Gets the command that detects installed TIA versions.
@@ -148,9 +159,23 @@ public sealed class MainWindowViewModel : ObservableObject
     public AsyncRelayCommand ExportCommand { get; }
 
     /// <summary>
+    /// Gets the command that scans project contents before export.
+    /// </summary>
+    public AsyncRelayCommand ScanProjectContentsCommand { get; }
+
+    /// <summary>
     /// Gets the command that requests cancellation of the current export run.
     /// </summary>
     public AsyncRelayCommand CancelExportCommand { get; }
+
+    /// <summary>
+    /// Gets scan status and guidance text.
+    /// </summary>
+    public string InventoryScanStatusText
+    {
+        get => _inventoryScanStatusText;
+        private set => SetProperty(ref _inventoryScanStatusText, value);
+    }
 
     /// <summary>
     /// Gets or sets the output directory.
@@ -177,7 +202,11 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             if (SetProperty(ref _projectPath, value))
             {
+                ResetPreScanState(string.IsNullOrWhiteSpace(value)
+                    ? "Set a TIA project path (.ap18/.ap19/.ap20) before export."
+                    : "Project path changed. Re-run 'Scan Project Contents'.");
                 ExportCommand.RaiseCanExecuteChanged();
+                ScanProjectContentsCommand.RaiseCanExecuteChanged();
                 ProjectPathValidationText = string.IsNullOrWhiteSpace(value)
                     ? "Set a TIA project path (.ap18/.ap19/.ap20) before export."
                     : "Path changed. Click 'Validate Project' to verify availability.";
@@ -250,6 +279,9 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             if (SetProperty(ref _tiaInstallationPathOverride, value))
             {
+                ResetPreScanState("TIA installation override changed. Re-run 'Scan Project Contents'.");
+                ExportCommand.RaiseCanExecuteChanged();
+                ScanProjectContentsCommand.RaiseCanExecuteChanged();
                 TiaInstallationValidationText = string.IsNullOrWhiteSpace(value)
                     ? "Manual TIA installation override is optional."
                     : "Path changed. Click 'Validate Path' to verify TIA V20 + Openness runtime.";
@@ -399,6 +431,7 @@ public sealed class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _isExporting, value))
             {
                 ExportCommand.RaiseCanExecuteChanged();
+                ScanProjectContentsCommand.RaiseCanExecuteChanged();
                 CancelExportCommand.RaiseCanExecuteChanged();
             }
         }
@@ -570,6 +603,15 @@ public sealed class MainWindowViewModel : ObservableObject
             return;
         }
 
+        if (_preScannedInventory is null)
+        {
+            StatusText = "Export not started";
+            CurrentObject = "Project scan required";
+            _logCollector.Add("Export aborted: Run 'Scan Project Contents' before exporting.");
+            InventoryScanStatusText = "Please run 'Scan Project Contents' and select at least one domain.";
+            return;
+        }
+
         var healthCheckResult = await _opennessHealthCheckService
             .CheckAsync(string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim(), CancellationToken.None);
 
@@ -622,9 +664,10 @@ public sealed class MainWindowViewModel : ObservableObject
                 EnableCompression,
                 SkipDiagnostics,
                 ExportMarkdown,
-                string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim());
+                string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim(),
+                BuildSelectedDomains());
 
-            var report = await _exportCoordinator.ExecuteAsync(options, HandleProgressAsync, cancellationTokenSource.Token);
+            var report = await _exportCoordinator.ExecuteAsync(options, HandleProgressAsync, _preScannedInventory, cancellationTokenSource.Token);
 
             SucceededCount = report.SucceededCount;
             FailedCount = report.FailedCount;
@@ -702,9 +745,61 @@ public sealed class MainWindowViewModel : ObservableObject
         }).Task;
     }
 
+    private async Task ScanProjectContentsAsync()
+    {
+        IsExporting = true;
+        ScanProjectContentsCommand.RaiseCanExecuteChanged();
+        ExportCommand.RaiseCanExecuteChanged();
+
+        try
+        {
+            StatusText = "Scanning project";
+            ProgressText = "Building inventory preview";
+            CurrentObject = "TIA project pre-scan";
+            EstimatedRemainingText = "Preparing selectable domains";
+            ProgressPercent = 0;
+
+            var inventory = await _inventoryProvider
+                .BuildInventoryAsync(
+                    string.IsNullOrWhiteSpace(ProjectPath) ? null : ProjectPath.Trim(),
+                    string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim(),
+                    CancellationToken.None);
+
+            _preScannedInventory = inventory;
+            PopulateSelectableDomains(inventory);
+            InventoryScanStatusText = $"Scan complete: {inventory.Objects.Count} objects discovered ({inventory.Status}). Select domains and start export.";
+            StatusText = "Scan completed";
+            ProgressText = "Review selection and start export";
+            CurrentObject = inventory.ProjectName ?? "Inventory preview ready";
+            EstimatedRemainingText = "Ready";
+            ProgressPercent = 100;
+        }
+        catch (Exception exception)
+        {
+            ResetPreScanState("Project scan failed. Check logs and retry.");
+            StatusText = "Scan failed";
+            ProgressText = "Inventory scan failed";
+            CurrentObject = exception.Message;
+            _logCollector.Add($"Project scan failed: {exception}");
+            throw;
+        }
+        finally
+        {
+            IsExporting = false;
+            ScanProjectContentsCommand.RaiseCanExecuteChanged();
+            ExportCommand.RaiseCanExecuteChanged();
+        }
+    }
+
     private bool CanExport() =>
         !IsExporting
         && !string.IsNullOrWhiteSpace(OutputDirectory)
+        && !string.IsNullOrWhiteSpace(ProjectPath)
+        && _preScannedInventory is not null
+        && SelectableDomains.Any(item => item.IsSelected && item.ObjectCount > 0);
+
+    private bool CanScanProjectContents() =>
+        !IsExporting
         && !string.IsNullOrWhiteSpace(ProjectPath);
 
     private bool CanCancelExport() => IsExporting && _exportCancellationTokenSource is { IsCancellationRequested: false };
@@ -740,6 +835,8 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             AddRecentOutputDirectory(directory);
         }
+
+        ScanProjectContentsCommand.RaiseCanExecuteChanged();
     }
 
     private async Task SavePersistedSettingsAsync(CancellationToken cancellationToken)
@@ -827,6 +924,61 @@ public sealed class MainWindowViewModel : ObservableObject
         return formats;
     }
 
+    private IReadOnlyCollection<ExportDomain> BuildSelectedDomains()
+    {
+        return SelectableDomains
+            .Where(item => item.IsSelected && item.ObjectCount > 0)
+            .Select(item => item.Domain)
+            .Distinct()
+            .ToArray();
+    }
+
+    private void ResetPreScanState(string reason)
+    {
+        foreach (var item in SelectableDomains)
+        {
+            item.PropertyChanged -= OnDomainSelectionChanged;
+        }
+
+        SelectableDomains.Clear();
+        _preScannedInventory = null;
+        InventoryScanStatusText = reason;
+    }
+
+    private void PopulateSelectableDomains(TiaProjectInventory inventory)
+    {
+        foreach (var item in SelectableDomains)
+        {
+            item.PropertyChanged -= OnDomainSelectionChanged;
+        }
+
+        SelectableDomains.Clear();
+
+        var counts = inventory.Objects
+            .GroupBy(TiaInventoryDomainClassifier.ResolveDomain)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        foreach (var domain in Enum.GetValues<ExportDomain>().OrderBy(domain => domain.ToString()))
+        {
+            var count = counts.TryGetValue(domain, out var value) ? value : 0;
+            var selection = new ExportDomainSelectionItem(domain, count, count > 0);
+            selection.PropertyChanged += OnDomainSelectionChanged;
+            SelectableDomains.Add(selection);
+        }
+
+        ExportCommand.RaiseCanExecuteChanged();
+    }
+
+    private void OnDomainSelectionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (!string.Equals(e.PropertyName, nameof(ExportDomainSelectionItem.IsSelected), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        ExportCommand.RaiseCanExecuteChanged();
+    }
+
     private static (bool IsValid, string Message) ValidateProjectPath(string? projectPath)
     {
         var candidate = projectPath?.Trim();
@@ -900,7 +1052,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.36";
+            return "0.0.37";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";

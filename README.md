@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.36`
+- Current application version: `0.0.37`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -94,6 +94,7 @@ If build complains about SDK mismatch, install that SDK first.
 - Heartbeat reliability hardening: UI logging provider is now registered directly in logging configuration and heartbeat parsing accepts both `HostHeartbeat|...` and raw `HB|...` payloads.
 - Out-of-memory hardening for deep-content export: host now enforces size limits for per-object XML export/source payloads, truncates oversized content in metadata bundles, and skips XML parsing for very large payloads.
 - Log UX improvement: log output now supports explicit "Jump to latest" and auto-scroll follows new entries until users scroll up manually.
+- Selective export workflow: UI now requires a pre-scan (`Scan Project Contents`) and allows selecting discovered export domains before running export.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -150,19 +151,22 @@ Windows validation workflow artifacts:
    - **TIA Installation Path Override (optional)**: manual TIA root path (for example `C:\Program Files\Siemens\Automation\Portal V20`) when auto detection fails
      - use **Browse** to select the folder
      - use **Validate Path** to check for **TIA V20 + Openness** (`Siemens.Engineering.dll`)
-4. Choose options:
+4. Click **Scan Project Contents**.
+   - review discovered domains and object counts
+   - select/deselect domains to export
+5. Choose options:
    - formats (`JSON`, `XML`, `Markdown`)
    - `Enable Compression`
    - `Skip Diagnostics`
-5. Click **Export**.
-6. Monitor progress, current object, counters, logs.
-7. Review generated artifacts under `<OutputDirectory>/Export`.
+6. Click **Export**.
+7. Monitor progress, current object, counters, logs.
+8. Review generated artifacts under `<OutputDirectory>/Export`.
 
 Notes:
 
 - Output directory history and settings are persisted in user profile (`LocalApplicationData`).
 - Export can be canceled from the UI; cancellation is cooperative.
-- Export now requires a valid project path; if invalid, export does not start and validation feedback is shown in UI.
+- Export now requires a valid project path and a successful pre-scan with at least one selected domain.
 
 ## Export output structure
 
@@ -184,13 +188,13 @@ Representative directories:
 - `Metadata`
 - `Reports`
 
-Per-object inventory artifacts are written under domain folders, for example:
+Inventory artifacts are written as domain/type bundles, for example:
 
-- `Hardware/Objects/*.json|*.xml|*.md`
-- `Blocks/Objects/*.json|*.xml|*.md`
-- `Tags/Objects/*.json|*.xml|*.md`
-- `UDTs/Objects/*.json|*.xml|*.md`
-- `HMI/Objects/*.json|*.xml|*.md`
+- `Hardware/Bundles/*.json|*.xml|*.md`
+- `Blocks/Bundles/*.json|*.xml|*.md`
+- `Tags/Bundles/*.json|*.xml|*.md`
+- `UDTs/Bundles/*.json|*.xml|*.md`
+- `HMI/Bundles/*.json|*.xml|*.md`
 
 Representative generated files:
 

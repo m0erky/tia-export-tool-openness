@@ -29,9 +29,12 @@ public sealed class ProjectInventoryStage : IExportStage
     /// <inheritdoc />
     public async Task ExecuteAsync(ExportExecutionContext context, CancellationToken cancellationToken)
     {
-        var inventory = await _inventoryProvider
-            .BuildInventoryAsync(context.Options.ProjectPath, context.Options.TiaInstallationPathOverride, cancellationToken)
-            .ConfigureAwait(false);
+        var inventory = context.Inventory
+            ?? await _inventoryProvider
+                .BuildInventoryAsync(context.Options.ProjectPath, context.Options.TiaInstallationPathOverride, cancellationToken)
+                .ConfigureAwait(false);
+
+        inventory = ApplyDomainFilter(inventory, context.Options.IncludedDomains);
         context.SetInventory(inventory);
         var jsonOptions = JsonOptionsFactory.CreateDefault();
 
@@ -80,6 +83,35 @@ public sealed class ProjectInventoryStage : IExportStage
         context.AddResult(new ExportedObjectResult("Inventory", inventory.ProjectName ?? "TIA project", status, inventory.Status.ToString()));
         await context.ReportProgressAsync(
             new ExportProgressUpdate(Name, inventory.ProjectName ?? "Inventory exported", inventory.Objects.Count, inventory.Objects.Count, TimeSpan.Zero)).ConfigureAwait(false);
+    }
+
+    private static TiaProjectInventory ApplyDomainFilter(TiaProjectInventory inventory, IReadOnlyCollection<ExportDomain>? includedDomains)
+    {
+        if (includedDomains is null || includedDomains.Count == 0)
+        {
+            return inventory;
+        }
+
+        var filteredObjects = inventory.Objects
+            .Where(node => includedDomains.Contains(TiaInventoryDomainClassifier.ResolveDomain(node)))
+            .ToArray();
+
+        if (filteredObjects.Length == inventory.Objects.Count)
+        {
+            return inventory;
+        }
+
+        var filterIssue = new ExportIssue(
+            "InventorySelection",
+            "Inventory filtered by selected export domains.",
+            $"Original objects: {inventory.Objects.Count}; Selected domains: {string.Join(", ", includedDomains.OrderBy(domain => domain.ToString()))}; Filtered objects: {filteredObjects.Length}");
+
+        return new TiaProjectInventory(
+            inventory.Status,
+            inventory.ProjectName,
+            inventory.ProjectPath,
+            filteredObjects,
+            inventory.Issues.Concat([filterIssue]).ToArray());
     }
 
     private static string BuildSummaryMarkdown(TiaProjectInventory inventory)

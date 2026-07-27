@@ -28,7 +28,8 @@ public sealed class InventoryObjectExportStage : IExportStage
         }
 
         var grouped = inventory.Objects
-            .GroupBy(node => new BundleKey(ResolveDomain(node), NormalizeObjectType(node.ObjectType)))
+            .Where(node => IsDomainIncluded(context.Options, node))
+            .GroupBy(node => new BundleKey(TiaInventoryDomainClassifier.ToFolderName(TiaInventoryDomainClassifier.ResolveDomain(node)), NormalizeObjectType(node.ObjectType)))
             .OrderBy(group => group.Key.Domain, StringComparer.OrdinalIgnoreCase)
             .ThenBy(group => group.Key.ObjectType, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -213,80 +214,18 @@ public sealed class InventoryObjectExportStage : IExportStage
         return compact;
     }
 
-    private static string ResolveDomain(TiaProjectObjectNode node)
+    private static bool IsDomainIncluded(ExportOptions options, TiaProjectObjectNode node)
     {
-        if (IsBlockObjectType(node.ObjectType))
+        var includedDomains = options.IncludedDomains;
+
+        if (includedDomains is null || includedDomains.Count == 0)
         {
-            return "Blocks";
+            return true;
         }
 
-        if (IsTagObjectType(node.ObjectType))
-        {
-            return "Tags";
-        }
-
-        if (IsUdtObjectType(node.ObjectType))
-        {
-            return "UDTs";
-        }
-
-        if (IsHmiObjectType(node.ObjectType))
-        {
-            return "HMI";
-        }
-
-        var candidate = $"{node.ObjectType} {node.QualifiedPath} {node.Name}";
-
-        if (ContainsAny(candidate, "Device", "Module", "Rack", "Hardware", "Cpu"))
-        {
-            return "Hardware";
-        }
-
-        if (ContainsAny(candidate, "Network", "Profinet", "Profibus", "Connection", "Subnet", "Port", "Interface"))
-        {
-            return "Network";
-        }
-
-        if (ContainsAny(candidate, "Library"))
-        {
-            return "Libraries";
-        }
-
-        if (ContainsAny(candidate, "Diagnostic", "Audit"))
-        {
-            return "Diagnostics";
-        }
-
-        return "Metadata";
+        var domain = TiaInventoryDomainClassifier.ResolveDomain(node);
+        return includedDomains.Contains(domain);
     }
-
-    private static bool IsBlockObjectType(string objectType) =>
-        objectType.Equals("OB", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("FB", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("FC", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("DB", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("InstanceDB", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("Block", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("FunctionBlock", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("OrganizationBlock", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("DataBlock", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsTagObjectType(string objectType) =>
-        objectType.Equals("Tag", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("TagTable", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("PlcTag", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsUdtObjectType(string objectType) =>
-        objectType.Equals("UDT", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("DataType", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsHmiObjectType(string objectType) =>
-        objectType.Equals("HMI", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("HmiObject", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("Screen", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("Faceplate", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("Recipe", StringComparison.OrdinalIgnoreCase)
-        || objectType.Equals("Alarm", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeObjectType(string objectType)
     {
@@ -297,9 +236,6 @@ public sealed class InventoryObjectExportStage : IExportStage
 
         return objectType.Trim();
     }
-
-    private static bool ContainsAny(string candidate, params string[] terms) =>
-        terms.Any(term => candidate.Contains(term, StringComparison.OrdinalIgnoreCase));
 
     private static string SanitizePathSegment(string value)
     {

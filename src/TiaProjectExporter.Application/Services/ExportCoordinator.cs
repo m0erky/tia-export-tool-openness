@@ -32,10 +32,16 @@ public sealed class ExportCoordinator
     public async Task<ExportReport> ExecuteAsync(
         ExportOptions options,
         Func<ExportProgressUpdate, Task>? progressCallback,
+        TiaProjectInventory? preloadedInventory,
         CancellationToken cancellationToken)
     {
         var artifactWriter = _artifactWriterFactory.Create(options.OutputDirectory);
         var context = new ExportExecutionContext(options, artifactWriter, _logger, progressCallback);
+
+        if (preloadedInventory is not null)
+        {
+            context.SetInventory(preloadedInventory);
+        }
 
         foreach (var stage in _stages)
         {

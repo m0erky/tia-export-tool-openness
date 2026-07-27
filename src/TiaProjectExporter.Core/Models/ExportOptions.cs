@@ -10,7 +10,8 @@ public sealed record ExportOptions(
     bool EnableCompression,
     bool SkipDiagnostics,
     bool GenerateMarkdownSummaries,
-    string? TiaInstallationPathOverride = null)
+    string? TiaInstallationPathOverride = null,
+    IReadOnlyCollection<ExportDomain>? IncludedDomains = null)
 {
     /// <summary>
     /// Creates default options for an export session.
@@ -23,5 +24,6 @@ public sealed record ExportOptions(
             EnableCompression: false,
             SkipDiagnostics: false,
             GenerateMarkdownSummaries: true,
-            TiaInstallationPathOverride: null);
+            TiaInstallationPathOverride: null,
+            IncludedDomains: null);
 }

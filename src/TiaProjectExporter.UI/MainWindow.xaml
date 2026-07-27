@@ -148,6 +148,32 @@
                               Content="Skip diagnostics"
                               IsChecked="{Binding SkipDiagnostics}" />
 
+                    <TextBlock Margin="0,16,0,6"
+                               Text="Selective Export (after Scan)" />
+                    <Border Padding="10"
+                            Background="#F8FBF5"
+                            BorderBrush="#DDE7D7"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <StackPanel>
+                            <TextBlock Foreground="#52624D"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding InventoryScanStatusText}" />
+                            <ListBox Margin="0,8,0,0"
+                                     MaxHeight="160"
+                                     ItemsSource="{Binding SelectableDomains}"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Margin="0,2,0,2"
+                                                  IsChecked="{Binding IsSelected}"
+                                                  Content="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+                    </Border>
+
                     <StackPanel Margin="0,22,0,0"
                                 Orientation="Horizontal">
                         <Button Width="170"
@@ -158,6 +184,10 @@
                                 Margin="0,0,10,0"
                                 Command="{Binding RunHealthCheckCommand}"
                                 Content="Health Check" />
+                        <Button Width="190"
+                                Margin="0,0,10,0"
+                                Command="{Binding ScanProjectContentsCommand}"
+                                Content="Scan Project Contents" />
                         <Button Width="150"
                                 Margin="0,0,10,0"
                                 Command="{Binding ExportCommand}"
