@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.34**
+Version baseline for this milestone: **0.0.35**
 
 Scope:
 
@@ -298,6 +298,11 @@ Scope:
   - made heartbeat parsing tolerant for both `HostHeartbeat|...` and raw `HB|...` log payloads
   - added timestamp parsing fallback to avoid stuck "Waiting for first heartbeat" state on format deviations
 - Incremented application version to `0.0.34` in central build metadata and UI fallback version resolution.
+- Added out-of-memory safeguards for out-of-process Openness host deep-content extraction:
+  - XML export file size guard before loading content into memory
+  - content truncation caps for `Content.ExportXml` and `Content.SourceText` metadata fields
+  - large XML parsing guard for source-text extraction from export XML
+- Incremented application version to `0.0.35` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

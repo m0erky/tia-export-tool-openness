@@ -20,6 +20,10 @@ internal static class Program
     private const int MaxItemsPerEnumerableProperty = 1000;
     private const int MaxScalarMetadataEntries = 128;
     private const int MaxScalarMetadataValueLength = 1024;
+    private const int MaxExportXmlFileBytes = 2 * 1024 * 1024;
+    private const int MaxExportXmlChars = 500_000;
+    private const int MaxSourceTextChars = 250_000;
+    private const int MaxXmlSourceParseChars = 1_000_000;
     private static readonly TimeSpan SlowPropertyThreshold = TimeSpan.FromSeconds(2);
 
     private static HeartbeatSession? _heartbeatSession;
@@ -1331,8 +1335,14 @@ internal static class Program
 
         if (TryExportNodeToXml(runtimeNode, out var exportedXml, out var exportError))
         {
-            metadata["Content.ExportXml"] = exportedXml;
+            var xmlWasTruncated = false;
+            var xmlForMetadata = TruncateContent(exportedXml, MaxExportXmlChars, out xmlWasTruncated);
+            metadata["Content.ExportXml"] = xmlForMetadata;
             metadata["Content.ExportXmlLength"] = exportedXml.Length.ToString();
+            if (xmlWasTruncated)
+            {
+                metadata["Content.ExportXmlTruncated"] = bool.TrueString;
+            }
         }
         else if (!string.IsNullOrWhiteSpace(exportError))
         {
@@ -1347,8 +1357,15 @@ internal static class Program
         if (TryExtractSourceText(runtimeNode, out var sourceText)
             || TryExtractSourceViaMethods(runtimeNode, out sourceText))
         {
-            metadata["Content.SourceText"] = sourceText;
+            var sourceWasTruncated = false;
+            var sourceForMetadata = TruncateContent(sourceText, MaxSourceTextChars, out sourceWasTruncated);
+            metadata["Content.SourceText"] = sourceForMetadata;
             metadata["Content.SourceTextLength"] = sourceText.Length.ToString();
+            if (sourceWasTruncated)
+            {
+                metadata["Content.SourceTextTruncated"] = bool.TrueString;
+            }
+
             return;
         }
 
@@ -1356,9 +1373,15 @@ internal static class Program
             && !string.IsNullOrWhiteSpace(xml)
             && TryExtractSourceTextFromExportXml(xml, out var extractedFromXml))
         {
-            metadata["Content.SourceText"] = extractedFromXml;
+            var sourceWasTruncated = false;
+            var sourceForMetadata = TruncateContent(extractedFromXml, MaxSourceTextChars, out sourceWasTruncated);
+            metadata["Content.SourceText"] = sourceForMetadata;
             metadata["Content.SourceTextLength"] = extractedFromXml.Length.ToString();
             metadata["Content.SourceOrigin"] = "ExportXml";
+            if (sourceWasTruncated)
+            {
+                metadata["Content.SourceTextTruncated"] = bool.TrueString;
+            }
         }
     }
 
@@ -1466,6 +1489,14 @@ internal static class Program
             if (!File.Exists(tempPath))
             {
                 error = $"Method {exportMethod} executed but produced no output file.";
+                return false;
+            }
+
+            var fileInfo = new FileInfo(tempPath);
+
+            if (fileInfo.Length > MaxExportXmlFileBytes)
+            {
+                error = $"Method {exportMethod} produced XML ({fileInfo.Length} bytes) exceeding limit ({MaxExportXmlFileBytes} bytes).";
                 return false;
             }
 
@@ -1631,6 +1662,11 @@ internal static class Program
     {
         sourceText = string.Empty;
 
+        if (xml.Length > MaxXmlSourceParseChars)
+        {
+            return false;
+        }
+
         try
         {
             var document = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
@@ -1702,6 +1738,19 @@ internal static class Program
             .ToArray();
 
         return string.Join(Environment.NewLine, lines).Trim();
+    }
+
+    private static string TruncateContent(string content, int maxChars, out bool wasTruncated)
+    {
+        wasTruncated = false;
+
+        if (content.Length <= maxChars)
+        {
+            return content;
+        }
+
+        wasTruncated = true;
+        return content.Substring(0, maxChars);
     }
 
     private static bool TryConvertScalarToString(object? value, out string serialized)
