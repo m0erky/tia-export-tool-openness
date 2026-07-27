@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.43`
+- Current application version: `0.0.44`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -96,6 +96,8 @@ If build complains about SDK mismatch, install that SDK first.
 - Log UX improvement: log output now supports explicit "Jump to latest" and auto-scroll follows new entries until users scroll up manually.
 - Selective export workflow: UI now requires a pre-scan (`Scan Project Contents`) and allows selecting discovered export domains before running export.
 - Lightweight pre-scan mode: selection scan now runs in preview traversal mode (coarse project/domain discovery) while the actual export still runs full traversal.
+- Preview PLC block hardening: preview now performs a bounded block-focused reflection fallback when primary PLC model traversal finds no blocks, improving FB/FC/DB/OB detection reliability in selection scans.
+- Preview diagnostics metadata: preview writes root-level counters (`PreviewDiagnostics.*`) for PLC entry points, block groups, discovered OB/FB/FC/DB counts, fallback activations, and preview limit hits.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 

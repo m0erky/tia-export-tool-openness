@@ -21,6 +21,8 @@ internal static class Program
     private const int MaxScalarMetadataEntries = 128;
     private const int MaxScalarMetadataValueLength = 1024;
     private const int MaxPreviewCandidates = 600;
+    private const int MaxPreviewFallbackDepth = 5;
+    private const int MaxPreviewFallbackNodes = 240;
     private const int MaxExportXmlFileBytes = 2 * 1024 * 1024;
     private const int MaxExportXmlChars = 500_000;
     private const int MaxSourceTextChars = 250_000;
@@ -449,6 +451,7 @@ internal static class Program
     private static void TraverseProjectPreview(object project, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
     {
         _heartbeatSession?.UpdatePhase("TraversePreview", "Inspecting project root and top-level software areas");
+        var diagnostics = new PreviewScanDiagnostics();
 
         var devicesProperty = project.GetType().GetProperty("Devices", BindingFlags.Public | BindingFlags.Instance);
         var devicesValue = devicesProperty?.GetValue(project);
@@ -492,6 +495,7 @@ internal static class Program
             foreach (var entry in ResolvePlcEntryPoints(device, devicePath, issues))
             {
                 entryCount++;
+                diagnostics.PlcEntryPointsDiscovered++;
                 if (entryCount > 25)
                 {
                     break;
@@ -504,6 +508,8 @@ internal static class Program
 
                 var previewVisited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var previewCount = 0;
+                var entryBlockCount = 0;
+                var entryBlockGroupCount = 0;
 
                 while (previewQueue.Count > 0 && previewCount < MaxPreviewCandidates)
                 {
@@ -527,6 +533,8 @@ internal static class Program
                             ? current.Path
                             : candidate.Path!;
 
+                        TrackPreviewDiagnostics(candidate.ObjectType ?? string.Empty, candidatePath, diagnostics, ref entryBlockCount, ref entryBlockGroupCount);
+
                         AddPreviewNode(objects, candidate.Node, candidatePath, current.Depth + 1, candidate.ObjectType, candidate.Strategy);
                         previewCount++;
 
@@ -541,8 +549,180 @@ internal static class Program
                         }
                     }
                 }
+
+                if (entryBlockCount == 0)
+                {
+                    diagnostics.BlockFallbackActivations++;
+                    var fallbackResult = DiscoverPreviewBlocksFallback(entry.Node, entry.Path, previewVisited, objects, issues, diagnostics);
+                    entryBlockCount += fallbackResult.BlockCount;
+                    entryBlockGroupCount += fallbackResult.BlockGroupCount;
+                }
+
+                if (previewCount >= MaxPreviewCandidates)
+                {
+                    diagnostics.EntryLimitHits++;
+                }
             }
         }
+
+        AddPreviewDiagnosticsMetadata(objects, diagnostics);
+    }
+
+    private static PreviewFallbackResult DiscoverPreviewBlocksFallback(
+        object entryNode,
+        string entryPath,
+        ISet<string> previewVisited,
+        ICollection<HostObjectNode> objects,
+        ICollection<HostIssue> issues,
+        PreviewScanDiagnostics diagnostics)
+    {
+        _heartbeatSession?.UpdatePhase("TraversePreviewFallback", entryPath);
+
+        var queue = new Queue<(object Node, string Path, int Depth)>();
+        queue.Enqueue((entryNode, entryPath, 2));
+
+        var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        var examinedNodes = 0;
+        var blockCount = 0;
+        var blockGroupCount = 0;
+
+        while (queue.Count > 0 && examinedNodes < MaxPreviewFallbackNodes)
+        {
+            var current = queue.Dequeue();
+
+            if (current.Depth > MaxPreviewFallbackDepth)
+            {
+                continue;
+            }
+
+            if (!visited.Add(current.Node))
+            {
+                continue;
+            }
+
+            foreach (var child in EnumeratePlcChildObjects(current.Node, current.Path, issues))
+            {
+                examinedNodes++;
+                diagnostics.BlockFallbackNodesVisited++;
+
+                if (examinedNodes > MaxPreviewFallbackNodes)
+                {
+                    break;
+                }
+
+                var childName = TryReadString(child, "Name") ?? TryReadString(child, "DisplayName") ?? child.GetType().Name;
+                var childPath = $"{current.Path}/{childName}";
+                var objectType = ClassifyPlcObjectType(child, childPath);
+                var previewKey = $"{objectType}|{childPath}";
+                var relevant = IsPreviewBlockRelevant(objectType, childPath);
+
+                if (relevant && previewVisited.Add(previewKey))
+                {
+                    AddPreviewNode(objects, child, childPath, current.Depth + 1, objectType, "HostPreviewBlockFallback");
+                    TrackPreviewDiagnostics(objectType, childPath, diagnostics, ref blockCount, ref blockGroupCount);
+                }
+
+                if (ShouldTraversePreviewFallbackChild(child, childPath, objectType))
+                {
+                    queue.Enqueue((child, childPath, current.Depth + 1));
+                }
+            }
+        }
+
+        return new PreviewFallbackResult(blockCount, blockGroupCount);
+    }
+
+    private static bool IsPreviewBlockRelevant(string objectType, string qualifiedPath)
+    {
+        if (objectType is "OB" or "FB" or "FC" or "DB" or "InstanceDB" or "BlockGroup")
+        {
+            return true;
+        }
+
+        return qualifiedPath.Contains("/Blocks/", StringComparison.OrdinalIgnoreCase)
+            || qualifiedPath.Contains("/BlockGroup", StringComparison.OrdinalIgnoreCase)
+            || qualifiedPath.Contains("/Groups/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldTraversePreviewFallbackChild(object child, string path, string objectType)
+    {
+        if (objectType == "BlockGroup")
+        {
+            return true;
+        }
+
+        if (IsPreviewBlockRelevant(objectType, path))
+        {
+            return false;
+        }
+
+        var candidate = $"{child.GetType().FullName} {child.GetType().Name} {path}";
+        return ContainsAny(candidate, "Plc", "Software", "Program", "Block", "Group", "CompileUnit", "Logic");
+    }
+
+    private static void TrackPreviewDiagnostics(
+        string objectType,
+        string qualifiedPath,
+        PreviewScanDiagnostics diagnostics,
+        ref int blockCount,
+        ref int blockGroupCount)
+    {
+        if (objectType == "BlockGroup" || qualifiedPath.Contains("/BlockGroup", StringComparison.OrdinalIgnoreCase))
+        {
+            diagnostics.BlockGroupsDiscovered++;
+            blockGroupCount++;
+            return;
+        }
+
+        switch (objectType)
+        {
+            case "OB":
+                diagnostics.ObBlocksDiscovered++;
+                blockCount++;
+                break;
+            case "FB":
+                diagnostics.FbBlocksDiscovered++;
+                blockCount++;
+                break;
+            case "FC":
+                diagnostics.FcBlocksDiscovered++;
+                blockCount++;
+                break;
+            case "DB":
+            case "InstanceDB":
+                diagnostics.DbBlocksDiscovered++;
+                blockCount++;
+                break;
+        }
+    }
+
+    private static void AddPreviewDiagnosticsMetadata(ICollection<HostObjectNode> objects, PreviewScanDiagnostics diagnostics)
+    {
+        HostObjectNode? projectRoot = null;
+        foreach (var node in objects)
+        {
+            if (node.Depth == 0 && string.Equals(node.QualifiedPath, "Project", StringComparison.OrdinalIgnoreCase))
+            {
+                projectRoot = node;
+                break;
+            }
+        }
+
+        if (projectRoot is null)
+        {
+            return;
+        }
+
+        projectRoot.Metadata ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        projectRoot.Metadata["PreviewDiagnostics.PlcEntryPoints"] = diagnostics.PlcEntryPointsDiscovered.ToString();
+        projectRoot.Metadata["PreviewDiagnostics.BlockGroups"] = diagnostics.BlockGroupsDiscovered.ToString();
+        projectRoot.Metadata["PreviewDiagnostics.OB"] = diagnostics.ObBlocksDiscovered.ToString();
+        projectRoot.Metadata["PreviewDiagnostics.FB"] = diagnostics.FbBlocksDiscovered.ToString();
+        projectRoot.Metadata["PreviewDiagnostics.FC"] = diagnostics.FcBlocksDiscovered.ToString();
+        projectRoot.Metadata["PreviewDiagnostics.DB"] = diagnostics.DbBlocksDiscovered.ToString();
+        projectRoot.Metadata["PreviewDiagnostics.FallbackActivations"] = diagnostics.BlockFallbackActivations.ToString();
+        projectRoot.Metadata["PreviewDiagnostics.FallbackNodesVisited"] = diagnostics.BlockFallbackNodesVisited.ToString();
+        projectRoot.Metadata["PreviewDiagnostics.PreviewLimitHits"] = diagnostics.EntryLimitHits.ToString();
     }
 
     private static void AddPreviewNode(
@@ -2312,6 +2492,40 @@ internal sealed class PlcTraversalCandidate
     public string? ObjectType { get; }
 
     public string? Strategy { get; }
+}
+
+internal sealed class PreviewFallbackResult
+{
+    public PreviewFallbackResult(int blockCount, int blockGroupCount)
+    {
+        BlockCount = blockCount;
+        BlockGroupCount = blockGroupCount;
+    }
+
+    public int BlockCount { get; }
+
+    public int BlockGroupCount { get; }
+}
+
+internal sealed class PreviewScanDiagnostics
+{
+    public int PlcEntryPointsDiscovered { get; set; }
+
+    public int BlockGroupsDiscovered { get; set; }
+
+    public int ObBlocksDiscovered { get; set; }
+
+    public int FbBlocksDiscovered { get; set; }
+
+    public int FcBlocksDiscovered { get; set; }
+
+    public int DbBlocksDiscovered { get; set; }
+
+    public int BlockFallbackActivations { get; set; }
+
+    public int BlockFallbackNodesVisited { get; set; }
+
+    public int EntryLimitHits { get; set; }
 }
 
 internal sealed class ReferenceEqualityComparer : IEqualityComparer<object>

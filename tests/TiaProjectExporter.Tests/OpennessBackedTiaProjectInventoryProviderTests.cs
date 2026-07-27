@@ -7,6 +7,56 @@ namespace TiaProjectExporter.Tests;
 public sealed class OpennessBackedTiaProjectInventoryProviderTests
 {
     [Fact]
+    public async Task BuildInventoryPreviewAsync_ForwardsPreviewDetailLevel_ToAdapter()
+    {
+        TiaTraversalDetailLevel? capturedDetailLevel = null;
+
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, detailLevel) =>
+        {
+            capturedDetailLevel = detailLevel;
+
+            return Task.FromResult(
+                new TiaProjectTraversalResult(
+                    ProjectName: "Sample",
+                    ProjectPath: projectPath,
+                    Objects: new[]
+                    {
+                        new TiaProjectObjectNode("Project", "Sample", "Project", 0)
+                    },
+                    Issues: Array.Empty<ExportIssue>()));
+        }));
+
+        _ = await provider.BuildInventoryPreviewAsync("C:/Projects/Sample.ap20", null, CancellationToken.None);
+
+        Assert.Equal(TiaTraversalDetailLevel.Preview, capturedDetailLevel);
+    }
+
+    [Fact]
+    public async Task BuildInventoryAsync_ForwardsFullDetailLevel_ToAdapter()
+    {
+        TiaTraversalDetailLevel? capturedDetailLevel = null;
+
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, detailLevel) =>
+        {
+            capturedDetailLevel = detailLevel;
+
+            return Task.FromResult(
+                new TiaProjectTraversalResult(
+                    ProjectName: "Sample",
+                    ProjectPath: projectPath,
+                    Objects: new[]
+                    {
+                        new TiaProjectObjectNode("Project", "Sample", "Project", 0)
+                    },
+                    Issues: Array.Empty<ExportIssue>()));
+        }));
+
+        _ = await provider.BuildInventoryAsync("C:/Projects/Sample.ap20", null, CancellationToken.None);
+
+        Assert.Equal(TiaTraversalDetailLevel.Full, capturedDetailLevel);
+    }
+
+    [Fact]
     public async Task BuildInventoryAsync_ReturnsUnavailable_WhenProjectPathMissing()
     {
         var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _, _) => throw new InvalidOperationException()));

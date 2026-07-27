@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.43**
+Version baseline for this milestone: **0.0.44**
 
 Scope:
 
@@ -51,8 +51,8 @@ Scope:
 ## Current State Snapshot (2026-07-27)
 
 ### Version / Commit
-- Version: `0.0.42`
-- Last commit: `3d955a7`
+- Version: `0.0.44`
+- Last commit: `341c0e1`
 - Branch: `main`
 
 ### Goal Right Now
@@ -70,18 +70,19 @@ Scope:
 - Full export path still uses full traversal (not preview objects).
 
 ### Current critical issue
-- In some real projects, preview scan can still under-detect PLC blocks (FB/FC/DB), even though they exist.
-- This is a preview detection quality issue, not necessarily full-export availability.
-- User expectation: scan must clearly show that blocks exist before export.
+- Preview detection quality is improved, but still needs Windows real-project validation across V18/V19/V20 to confirm reliable FB/FC/DB/OB visibility in all runtime graph variants.
+- Residual risk: edge-case Siemens object graphs may still expose blocks behind service/property variants not covered by current bounded fallback.
 
 ### Recent technical changes (latest)
-- Added traversal detail levels: `Preview` vs `Full`.
-- Pre-scan switched to `BuildInventoryPreviewAsync`.
-- Host supports `--preview`.
-- Preview traversal expanded to inspect PLC model children (`BlockGroup`, nested groups, tags/types/etc.).
-- Selection safety fallback:
-  - all domains selected by default after scan
-  - export no longer blocked by preview count `> 0`.
+- Preview scan now records root-level diagnostics counters in project metadata:
+  - discovered PLC entry points
+  - discovered `BlockGroup` count
+  - discovered `OB`/`FB`/`FC`/`DB` counts
+  - fallback activations, fallback nodes visited, preview limit hits.
+- Added targeted preview fallback for block discovery:
+  - if normal preview walk finds no blocks for an entry point, run bounded PLC reflection fallback focused on block-relevant runtime paths.
+  - fallback is depth/node capped (`MaxPreviewFallbackDepth=5`, `MaxPreviewFallbackNodes=240`) to protect performance/memory on large projects.
+- Added provider-level test coverage to ensure preview/full traversal detail-level forwarding remains correct (`Preview` vs `Full`).
 
 ### Critical files
 - `src/TiaProjectExporter.OpennessHost/Program.cs`
@@ -94,8 +95,8 @@ Scope:
 - `src/TiaProjectExporter.Export/Stages/InventoryObjectExportStage.cs`
 
 ### Open bugs / risks
-- Preview may still miss blocks in specific Siemens runtime object graphs.
-- Need stronger preview instrumentation/logging for why block branches are skipped.
+- Preview still depends on runtime-type heuristics in fallback traversal and can miss rare proprietary object patterns.
+- Preview diagnostics are currently metadata-only and should be surfaced more explicitly in Windows UI logs for field support.
 - Full export quality still depends on typed extraction depth + robust fallback handling.
 
 ### Decisions (do not change without reason)
@@ -105,16 +106,14 @@ Scope:
 - Keep bundle-first output structure for large projects.
 
 ### Next 3 steps (priority)
-1. Add preview diagnostics counters:
-   - discovered PLC entry points
-   - discovered `BlockGroup` count
-   - discovered block object count by type (`OB/FB/FC/DB`).
-2. Add targeted fallback in preview:
-   - if `BlockGroup` unresolved, run bounded reflection fallback specifically for `Blocks` collections.
-3. Add test coverage for preview block discovery path (mock/stub host response and classifier expectations).
+1. Validate preview reliability on Windows real projects (V18/V19/V20):
+   - compare TIA block counts vs preview counters (`PreviewDiagnostics.*`) and UI domain counts.
+2. Promote preview diagnostics into user-visible runtime logs:
+   - explicit per-scan summary in UI log output for fast support triage.
+3. Expand test coverage around host-response preview diagnostics parsing + domain-count expectations for block-heavy inventories.
 
 ### Validation checklist
-- [ ] `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj --no-restore -v minimal`
+- [x] `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj --no-restore -v minimal`
 - [ ] UI: `Scan Project Contents` shows non-zero Blocks for known project with FB/FC/DB.
 - [ ] UI: Export runs after scan with default selections.
 - [ ] Export output contains block bundles and source/xml content where available.
@@ -406,6 +405,10 @@ Scope:
 - Incremented application version to `0.0.41` in central build metadata and UI fallback version resolution.
 - Improved preview scan block detection by extending preview traversal with bounded PLC model child enumeration (`BlockGroup`, nested groups, tags/types/technology sources) so Blocks/Tags/UDTs are visible in selection even in lightweight mode.
 - Incremented application version to `0.0.42` in central build metadata and UI fallback version resolution.
+- Hardened preview scan PLC block discovery with bounded block-focused reflection fallback (`HostPreviewBlockFallback`) that activates when entry-point preview traversal yields no blocks.
+- Added preview diagnostics counters persisted on root metadata (`PreviewDiagnostics.*`) for PLC entry points, block-group counts, block-type counts (OB/FB/FC/DB), fallback activity, and preview limit hits.
+- Added inventory-provider tests to validate traversal detail-level forwarding (`BuildInventoryPreviewAsync` => `Preview`, `BuildInventoryAsync` => `Full`).
+- Incremented application version to `0.0.44` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 
