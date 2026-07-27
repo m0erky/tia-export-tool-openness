@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.22**
+Version baseline for this milestone: **0.0.23**
 
 Scope:
 
@@ -256,6 +256,9 @@ Scope:
 - Added dedicated PLC-focused host traversal pass that explicitly targets software/block/tag/datatype candidate properties to improve runtime discovery of PLC assets beyond generic hardware graph traversal.
 - Added PLC-aware object classification in host (`OB`, `FB`, `FC`, `DB`, `InstanceDB`, `Tag`, `TagTable`, `UDT`, `TechnologyObject`, `Source`) to improve downstream domain routing and export usefulness.
 - Incremented application version to `0.0.22` in central build metadata and UI fallback version resolution.
+- Added bounded scalar metadata extraction (`Prop.*`) per discovered runtime node in host traversal to capture more settings/configuration fields in exported object artifacts.
+- Added metadata safeguards (entry/value limits and slow-property diagnostics) to balance depth with stability on large projects.
+- Incremented application version to `0.0.23` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

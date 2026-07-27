@@ -16,6 +16,8 @@ internal static class Program
     private const int MaxPlcTraversalDepth = 10;
     private const int MaxChildrenPerNode = 2000;
     private const int MaxItemsPerEnumerableProperty = 1000;
+    private const int MaxScalarMetadataEntries = 128;
+    private const int MaxScalarMetadataValueLength = 1024;
     private static readonly TimeSpan SlowPropertyThreshold = TimeSpan.FromSeconds(2);
 
     private static HeartbeatSession? _heartbeatSession;
@@ -155,7 +157,8 @@ internal static class Program
                 Depth = 0,
                 Metadata = new Dictionary<string, string>
                 {
-                    ["SourcePath"] = options.ProjectPath
+                    ["SourcePath"] = options.ProjectPath,
+                    ["ExtractionStrategy"] = "HostRoot"
                 }
             }
         };
@@ -248,7 +251,9 @@ internal static class Program
                 Metadata = new Dictionary<string, string>
                 {
                     ["AssemblyPath"] = assemblyPath,
-                    ["AssemblyName"] = engineeringAssembly.GetName().Name ?? "Unknown"
+                    ["AssemblyName"] = engineeringAssembly.GetName().Name ?? "Unknown",
+                    ["AssemblyVersion"] = engineeringAssembly.GetName().Version?.ToString() ?? "Unknown",
+                    ["ExtractionStrategy"] = "HostRuntime"
                 }
             });
 
@@ -371,10 +376,7 @@ internal static class Program
                 Name = projectName!,
                 QualifiedPath = "Project/Metadata",
                 Depth = 1,
-                Metadata = new Dictionary<string, string>
-                {
-                    ["RuntimeType"] = project.GetType().FullName ?? "Unknown"
-                }
+                Metadata = BuildNodeMetadata(project, "HostProjectMetadata", "Project/Metadata", issues)
             });
         }
 
@@ -411,10 +413,7 @@ internal static class Program
                 Name = deviceName,
                 QualifiedPath = devicePath,
                 Depth = 1,
-                Metadata = new Dictionary<string, string>
-                {
-                    ["RuntimeType"] = device.GetType().FullName ?? "Unknown"
-                }
+                Metadata = BuildNodeMetadata(device, "HostDevice", devicePath, issues)
             });
 
             deviceCount++;
@@ -489,11 +488,7 @@ internal static class Program
                     Name = childName,
                     QualifiedPath = childPath,
                     Depth = current.Depth + 1,
-                    Metadata = new Dictionary<string, string>
-                    {
-                        ["RuntimeType"] = child.GetType().FullName ?? childTypeName,
-                        ["ExtractionStrategy"] = "HostReflection"
-                    }
+                    Metadata = BuildNodeMetadata(child, "HostReflection", childPath, issues)
                 });
 
                 discoveredCount++;
@@ -590,11 +585,7 @@ internal static class Program
                     Name = childName,
                     QualifiedPath = childPath,
                     Depth = current.Depth + 1,
-                    Metadata = new Dictionary<string, string>
-                    {
-                        ["RuntimeType"] = child.GetType().FullName ?? child.GetType().Name,
-                        ["ExtractionStrategy"] = "HostReflectionPlcFocus"
-                    }
+                    Metadata = BuildNodeMetadata(child, "HostReflectionPlcFocus", childPath, issues)
                 });
 
                 childrenAdded++;
@@ -897,6 +888,119 @@ internal static class Program
         }
 
         return false;
+    }
+
+    private static Dictionary<string, string> BuildNodeMetadata(object runtimeNode, string extractionStrategy, string qualifiedPath, ICollection<HostIssue> issues)
+    {
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["RuntimeType"] = runtimeNode.GetType().FullName ?? runtimeNode.GetType().Name,
+            ["ExtractionStrategy"] = extractionStrategy,
+            ["QualifiedPath"] = qualifiedPath
+        };
+
+        var scalarCount = 0;
+
+        foreach (var property in runtimeNode.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (scalarCount >= MaxScalarMetadataEntries)
+            {
+                metadata["ScalarPropertyLimitReached"] = bool.TrueString;
+                break;
+            }
+
+            if (!IsSafeScalarProperty(property))
+            {
+                continue;
+            }
+
+            object? value;
+            Stopwatch? timer = null;
+
+            try
+            {
+                timer = Stopwatch.StartNew();
+                value = property.GetValue(runtimeNode);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (timer is not null && timer.Elapsed > SlowPropertyThreshold)
+            {
+                issues.Add(new HostIssue
+                {
+                    Scope = "OpennessTraversal",
+                    Message = "Slow scalar property access detected during metadata extraction.",
+                    Details = $"Node: {qualifiedPath}; Property: {property.Name}; Elapsed: {timer.Elapsed:c}"
+                });
+            }
+
+            if (!TryConvertScalarToString(value, out var serializedValue))
+            {
+                continue;
+            }
+
+            if (serializedValue.Length > MaxScalarMetadataValueLength)
+            {
+                serializedValue = serializedValue[..MaxScalarMetadataValueLength];
+            }
+
+            metadata[$"Prop.{property.Name}"] = serializedValue;
+            scalarCount++;
+        }
+
+        metadata["ScalarPropertyCount"] = scalarCount.ToString();
+        return metadata;
+    }
+
+    private static bool IsSafeScalarProperty(PropertyInfo property)
+    {
+        if (!property.CanRead || property.GetIndexParameters().Length > 0)
+        {
+            return false;
+        }
+
+        if (ShouldSkipProperty(property) || IsCandidateChildProperty(property) || IsPlcCandidateProperty(property))
+        {
+            return false;
+        }
+
+        var propertyType = property.PropertyType;
+
+        if (typeof(IEnumerable).IsAssignableFrom(propertyType) && propertyType != typeof(string))
+        {
+            return false;
+        }
+
+        return IsSimpleValue(propertyType)
+            || (Nullable.GetUnderlyingType(propertyType) is Type underlying && IsSimpleValue(underlying));
+    }
+
+    private static bool TryConvertScalarToString(object? value, out string serialized)
+    {
+        if (value is null)
+        {
+            serialized = string.Empty;
+            return true;
+        }
+
+        switch (value)
+        {
+            case DateTime dateTime:
+                serialized = dateTime.ToString("O");
+                return true;
+            case DateTimeOffset dateTimeOffset:
+                serialized = dateTimeOffset.ToString("O");
+                return true;
+            case TimeSpan timeSpan:
+                serialized = timeSpan.ToString("c");
+                return true;
+            default:
+                serialized = value.ToString() ?? string.Empty;
+                return true;
+        }
     }
 
     private static bool IsSimpleValue(Type type)
