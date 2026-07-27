@@ -14,8 +14,6 @@
     <ProjectReference Include="..\TiaProjectExporter.Infrastructure\TiaProjectExporter.Infrastructure.csproj" />
     <ProjectReference Include="..\TiaProjectExporter.Tia\TiaProjectExporter.Tia.csproj" />
     <ProjectReference Include="..\TiaProjectExporter.Export\TiaProjectExporter.Export.csproj" />
-    <ProjectReference Include="..\TiaProjectExporter.OpennessHost\TiaProjectExporter.OpennessHost.csproj"
-                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,6 +30,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="BuildOpennessHost" BeforeTargets="Build;Publish">
+    <MSBuild Projects="..\TiaProjectExporter.OpennessHost\TiaProjectExporter.OpennessHost.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)" />
+  </Target>
 
   <Target Name="CopyOpennessHostArtifacts" AfterTargets="Build;Publish">
     <ItemGroup>

@@ -272,8 +272,8 @@ internal static class Program
         {
             ProjectName = Path.GetFileNameWithoutExtension(projectPath),
             ProjectPath = projectPath,
-            Objects = objects,
-            Issues = issues
+            Objects = objects.ToList(),
+            Issues = issues.ToList()
         };
     }
 
@@ -342,7 +342,7 @@ internal static class Program
             objects.Add(new HostObjectNode
             {
                 ObjectType = "ProjectMetadata",
-                Name = projectName,
+                Name = projectName!,
                 QualifiedPath = "Project/Metadata",
                 Depth = 1,
                 Metadata = new Dictionary<string, string>
@@ -647,9 +647,9 @@ internal static class Program
         return string.Join(" | Inner: ", segments);
     }
 
-    private static void WriteJson(HostTraversalResponse response)
+    private static void WriteJson(object response)
     {
-        var serializer = new DataContractJsonSerializer(typeof(HostTraversalResponse));
+        var serializer = new DataContractJsonSerializer(response.GetType());
         using var memoryStream = new MemoryStream();
         serializer.WriteObject(memoryStream, response);
         memoryStream.Position = 0;
@@ -682,7 +682,7 @@ internal sealed class HostOptions
         return new HostOptions
         {
             ProjectPath = projectPath ?? string.Empty,
-            InstallPath = installPath
+            InstallPath = installPath!
         };
     }
 

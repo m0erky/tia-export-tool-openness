@@ -58,6 +58,7 @@ The exporter uses a pipeline of independent stages (`IExportStage`) so failures 
 - Visual Studio 2022 (or newer) with:
   - `.NET desktop development` workload (for WPF)
   - .NET 8 SDK
+  - .NET Framework 4.8 Developer Pack (required to build `TiaProjectExporter.OpennessHost`)
 - TIA Portal installation(s), ideally V18/V19/V20 with Openness available
 - Access rights to open target TIA project files
 
@@ -71,7 +72,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.6`
+- Current application version: `0.0.7`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 

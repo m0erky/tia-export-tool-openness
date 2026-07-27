@@ -804,7 +804,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.6";
+            return "0.0.7";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";

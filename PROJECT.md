@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.6**
+Version baseline for this milestone: **0.0.7**
 
 Scope:
 
@@ -210,6 +210,10 @@ Scope:
 - Incremented application version to `0.0.5` in central build metadata and UI fallback version resolution.
 - Fixed .NET Framework 4.8 host build compatibility by replacing `init` accessors with `set` accessors in host options (`IsExternalInit` no longer required).
 - Incremented application version to `0.0.6` in central build metadata and UI fallback version resolution.
+- Fixed additional net48 host compile issues (generic JSON serializer target, nullable assignment guards, and list conversion mismatches).
+- Reworked UI build orchestration to invoke host build via MSBuild target instead of cross-TFM project reference to avoid NU1702 compatibility warning.
+- Documented .NET Framework 4.8 Developer Pack prerequisite for Windows builds.
+- Incremented application version to `0.0.7` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
