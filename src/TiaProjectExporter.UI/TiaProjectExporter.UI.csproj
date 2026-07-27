@@ -34,7 +34,7 @@
   <Target Name="BuildOpennessHost" BeforeTargets="Build;Publish">
     <MSBuild Projects="..\TiaProjectExporter.OpennessHost\TiaProjectExporter.OpennessHost.csproj"
              Targets="Build"
-             Properties="Configuration=$(Configuration)" />
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=;SelfContained=false;PublishSingleFile=false;PublishTrimmed=false" />
   </Target>
 
   <Target Name="CopyOpennessHostArtifacts" AfterTargets="Build;Publish">

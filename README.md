@@ -74,13 +74,14 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.20`
+- Current application version: `0.0.21`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
 - Host-response parsing hardening: out-of-process adapter now accepts `metadata` in both JSON object form and DataContract-style `[{"Key","Value"}]` array form to prevent `JsonException` inventory aborts.
 - Host packaging hardening: UI build/publish now copies the full net48 host runtime folder (including NuGet-resolved Siemens collaboration dependencies) so `TiaProjectExporter.OpennessHost.exe` can load all required assemblies at runtime.
 - Inventory object export stage now emits per-object artifacts into domain folders (`Export/<Domain>/Objects/...`) in JSON/XML/Markdown (based on selected formats).
+- Publish/build orchestration now builds the net48 Openness host without inheriting UI runtime RID settings, preventing `NETSDK1047` (`net48/win-x64`) during UI publish.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -112,6 +113,12 @@ dotnet publish src/TiaProjectExporter.UI/TiaProjectExporter.UI.csproj -c Release
 If you hit `NETSDK1047` for `net8.0-windows/win-x64`, ensure publish restore runs with `-r win-x64` (or remove `--no-restore` and let publish restore with runtime).
 
 Note: publish output now includes `TiaProjectExporter.OpennessHost.exe` (net48), which is required for stable Siemens Openness execution.
+
+If Siemens build targets log "Unable to locate Siemens.Engineering assemblies" during restore/build, pass the local PublicAPI folder explicitly, for example:
+
+```powershell
+dotnet publish src/TiaProjectExporter.UI/TiaProjectExporter.UI.csproj -c Release -r win-x64 --self-contained true -p:TiaPortalLocation="C:\Program Files\Siemens\Automation\Portal V20\PublicAPI"
+```
 
 Windows validation workflow artifacts:
 
