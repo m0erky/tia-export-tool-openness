@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.32**
+Version baseline for this milestone: **0.0.33**
 
 Scope:
 
@@ -289,6 +289,10 @@ Scope:
 - Extended PLC model traversal with explicit collections (`BlockGroup`, `TagTableGroup`, `TypeGroup`, `TechnologyObjects`, `ExternalSources`, `Sources`) to improve extraction coverage of blocks/tags/types/sources.
 - Tightened PLC runtime filtering to keep export bundles focused on engineering-relevant software objects and reduce low-value object noise.
 - Incremented application version to `0.0.32` in central build metadata and UI fallback version resolution.
+- Fixed net48 host compile issues after export-overload hardening:
+  - nullable flow warnings in error/source assignment (`CS8604`, `CS8601`)
+  - removed unsupported `string.Replace` overload with `StringComparison` for .NET Framework (`CS1501`)
+- Incremented application version to `0.0.33` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

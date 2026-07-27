@@ -1415,7 +1415,7 @@ internal static class Program
 
             if (!string.IsNullOrWhiteSpace(methodError))
             {
-                errors.Add(methodError);
+                errors.Add(methodError!);
             }
         }
 
@@ -1615,7 +1615,7 @@ internal static class Program
                     continue;
                 }
 
-                sourceText = value;
+                sourceText = value!;
                 return true;
             }
             catch
@@ -1695,7 +1695,7 @@ internal static class Program
         }
 
         var lines = raw
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r\n", "\n")
             .Replace('\r', '\n')
             .Split('\n')
             .Select(line => line.TrimEnd())
