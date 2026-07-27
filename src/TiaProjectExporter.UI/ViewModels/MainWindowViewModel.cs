@@ -667,7 +667,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim(),
                 BuildSelectedDomains());
 
-            var report = await _exportCoordinator.ExecuteAsync(options, HandleProgressAsync, _preScannedInventory, cancellationTokenSource.Token);
+            var report = await _exportCoordinator.ExecuteAsync(options, HandleProgressAsync, preloadedInventory: null, cancellationTokenSource.Token);
 
             SucceededCount = report.SucceededCount;
             FailedCount = report.FailedCount;
@@ -760,7 +760,7 @@ public sealed class MainWindowViewModel : ObservableObject
             ProgressPercent = 0;
 
             var inventory = await _inventoryProvider
-                .BuildInventoryAsync(
+                .BuildInventoryPreviewAsync(
                     string.IsNullOrWhiteSpace(ProjectPath) ? null : ProjectPath.Trim(),
                     string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim(),
                     CancellationToken.None);
@@ -1052,7 +1052,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.38";
+            return "0.0.39";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";

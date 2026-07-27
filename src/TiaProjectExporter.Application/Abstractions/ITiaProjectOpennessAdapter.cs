@@ -10,5 +10,9 @@ public interface ITiaProjectOpennessAdapter
     /// <summary>
     /// Traverses a TIA project and returns discovered objects plus adapter-level issues.
     /// </summary>
-    Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken);
+    Task<TiaProjectTraversalResult> TraverseAsync(
+        string projectPath,
+        string? tiaInstallationPathOverride,
+        TiaTraversalDetailLevel detailLevel,
+        CancellationToken cancellationToken);
 }

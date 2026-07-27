@@ -9,7 +9,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     [Fact]
     public async Task BuildInventoryAsync_ReturnsUnavailable_WhenProjectPathMissing()
     {
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _) => throw new InvalidOperationException()));
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _, _) => throw new InvalidOperationException()));
 
         var inventory = await provider.BuildInventoryAsync(null, null, CancellationToken.None);
 
@@ -21,7 +21,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     [Fact]
     public async Task BuildInventoryAsync_ReturnsPartial_WhenTraversalReturnsIssues()
     {
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _) =>
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, _) =>
             Task.FromResult(
                 new TiaProjectTraversalResult(
                     ProjectName: "Sample",
@@ -46,7 +46,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     [Fact]
     public async Task BuildInventoryAsync_ReturnsUnavailable_WhenOnlyRootObjectExistsAndIssuesPresent()
     {
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _) =>
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, _) =>
             Task.FromResult(
                 new TiaProjectTraversalResult(
                     ProjectName: "Sample",
@@ -70,7 +70,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     [Fact]
     public async Task BuildInventoryAsync_ReturnsUnavailable_WhenTraversalThrows()
     {
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _) => throw new InvalidOperationException("Boom")));
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _, _) => throw new InvalidOperationException("Boom")));
 
         var inventory = await provider.BuildInventoryAsync("C:/Projects/Sample.ap18", null, CancellationToken.None);
 
@@ -84,7 +84,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     {
         string? capturedOverride = null;
 
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, overridePath) =>
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, overridePath, _) =>
         {
             capturedOverride = overridePath;
 
@@ -103,14 +103,14 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
 
     private sealed class StubOpennessAdapter : ITiaProjectOpennessAdapter
     {
-        private readonly Func<string, string?, Task<TiaProjectTraversalResult>> _traverseAsync;
+        private readonly Func<string, string?, TiaTraversalDetailLevel, Task<TiaProjectTraversalResult>> _traverseAsync;
 
-        public StubOpennessAdapter(Func<string, string?, Task<TiaProjectTraversalResult>> traverseAsync)
+        public StubOpennessAdapter(Func<string, string?, TiaTraversalDetailLevel, Task<TiaProjectTraversalResult>> traverseAsync)
         {
             _traverseAsync = traverseAsync;
         }
 
-        public Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken) =>
-            _traverseAsync(projectPath, tiaInstallationPathOverride);
+        public Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, string? tiaInstallationPathOverride, TiaTraversalDetailLevel detailLevel, CancellationToken cancellationToken) =>
+            _traverseAsync(projectPath, tiaInstallationPathOverride, detailLevel);
     }
 }

@@ -19,7 +19,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapterTests
             new StubDiscoveryService(Array.Empty<DiscoveredTiaPortalInstallation>()),
             NullLogger<OutOfProcessTiaProjectOpennessAdapter>.Instance);
 
-        var result = await adapter.TraverseAsync("/tmp/sample.ap20", null, CancellationToken.None);
+        var result = await adapter.TraverseAsync("/tmp/sample.ap20", null, TiaTraversalDetailLevel.Full, CancellationToken.None);
 
         Assert.NotEmpty(result.Objects);
         Assert.Contains(result.Issues, issue => issue.Scope == "OpennessHost");

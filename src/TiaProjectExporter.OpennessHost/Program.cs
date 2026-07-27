@@ -279,7 +279,14 @@ internal static class Program
             }
 
             _heartbeatSession.UpdatePhase("Traverse", "Walking project graph");
-            TraverseProject(project, objects, issues);
+            if (options.IsPreview)
+            {
+                TraverseProjectPreview(project, objects, issues);
+            }
+            else
+            {
+                TraverseProject(project, objects, issues);
+            }
         }
         catch (Exception exception)
         {
@@ -435,6 +442,77 @@ internal static class Program
                 Message = "No devices were discovered in the project.",
                 Details = "Project may be empty, protected, or incompatible."
             });
+        }
+    }
+
+    private static void TraverseProjectPreview(object project, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
+    {
+        _heartbeatSession?.UpdatePhase("TraversePreview", "Inspecting project root and top-level software areas");
+
+        var devicesProperty = project.GetType().GetProperty("Devices", BindingFlags.Public | BindingFlags.Instance);
+        var devicesValue = devicesProperty?.GetValue(project);
+
+        if (devicesValue is not IEnumerable devices)
+        {
+            issues.Add(new HostIssue
+            {
+                Scope = "OpennessTraversal",
+                Message = "Project devices collection not available.",
+                Details = "No enumerable Devices property."
+            });
+            return;
+        }
+
+        foreach (var device in devices)
+        {
+            if (device is null)
+            {
+                continue;
+            }
+
+            var deviceName = TryReadString(device, "Name") ?? TryReadString(device, "DisplayName") ?? "Device";
+            var devicePath = $"Project/Devices/{deviceName}";
+
+            objects.Add(new HostObjectNode
+            {
+                ObjectType = "Device",
+                Name = deviceName,
+                QualifiedPath = devicePath,
+                Depth = 1,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["RuntimeType"] = device.GetType().FullName ?? device.GetType().Name,
+                    ["ExtractionStrategy"] = "HostPreview",
+                    ["QualifiedPath"] = devicePath
+                }
+            });
+
+            var entryCount = 0;
+            foreach (var entry in ResolvePlcEntryPoints(device, devicePath, issues))
+            {
+                entryCount++;
+                if (entryCount > 25)
+                {
+                    break;
+                }
+
+                var objectType = ClassifyPlcObjectType(entry.Node, entry.Path);
+                var name = TryReadString(entry.Node, "Name") ?? TryReadString(entry.Node, "DisplayName") ?? entry.Node.GetType().Name;
+
+                objects.Add(new HostObjectNode
+                {
+                    ObjectType = objectType,
+                    Name = name,
+                    QualifiedPath = entry.Path,
+                    Depth = 2,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["RuntimeType"] = entry.Node.GetType().FullName ?? entry.Node.GetType().Name,
+                        ["ExtractionStrategy"] = "HostPreview",
+                        ["QualifiedPath"] = entry.Path
+                    }
+                });
+            }
         }
     }
 
@@ -2121,6 +2199,8 @@ internal sealed class HostOptions
 
     public string InstallPath { get; set; } = string.Empty;
 
+    public bool IsPreview { get; set; }
+
     public static HostOptions Parse(string[] args, bool requireProjectPath = true)
     {
         var projectPath = GetValue(args, "--project");
@@ -2139,7 +2219,8 @@ internal sealed class HostOptions
         return new HostOptions
         {
             ProjectPath = projectPath ?? string.Empty,
-            InstallPath = installPath!
+            InstallPath = installPath!,
+            IsPreview = args.Any(argument => string.Equals(argument, "--preview", StringComparison.OrdinalIgnoreCase))
         };
     }
 

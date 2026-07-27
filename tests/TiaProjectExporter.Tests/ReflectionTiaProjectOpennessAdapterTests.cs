@@ -21,7 +21,7 @@ public sealed class ReflectionTiaProjectOpennessAdapterTests
             Array.Empty<ITiaDomainExtractor>(),
             NullLogger<ReflectionTiaProjectOpennessAdapter>.Instance);
 
-        var result = await adapter.TraverseAsync("/tmp/sample.ap18", null, CancellationToken.None);
+        var result = await adapter.TraverseAsync("/tmp/sample.ap18", null, TiaTraversalDetailLevel.Full, CancellationToken.None);
 
         Assert.NotEmpty(result.Objects);
         Assert.Contains(result.Issues, issue => issue.Scope == "OpennessRuntime");
@@ -43,6 +43,7 @@ public sealed class ReflectionTiaProjectOpennessAdapterTests
         var result = await adapter.TraverseAsync(
             "/tmp/sample.ap20",
             @"C:\Program Files\Siemens\Automation\Portal V20",
+            TiaTraversalDetailLevel.Full,
             CancellationToken.None);
 
         Assert.NotEmpty(result.Objects);

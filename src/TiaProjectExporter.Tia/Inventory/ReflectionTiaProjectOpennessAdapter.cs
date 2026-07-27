@@ -30,7 +30,11 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
     }
 
     /// <inheritdoc />
-    public async Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken)
+    public async Task<TiaProjectTraversalResult> TraverseAsync(
+        string projectPath,
+        string? tiaInstallationPathOverride,
+        TiaTraversalDetailLevel detailLevel,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

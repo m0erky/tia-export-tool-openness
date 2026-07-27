@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.38**
+Version baseline for this milestone: **0.0.39**
 
 Scope:
 
@@ -315,6 +315,10 @@ Scope:
 - Incremented application version to `0.0.37` in central build metadata and UI fallback version resolution.
 - Fixed domain-classification regression where non-root objects (for example devices under `Project/...`) were incorrectly mapped to `Project`; project-domain mapping now targets root/project nodes only.
 - Incremented application version to `0.0.38` in central build metadata and UI fallback version resolution.
+- Introduced traversal detail levels (`Preview` vs `Full`) for Openness traversal.
+- Pre-scan now uses lightweight preview inventory (`BuildInventoryPreviewAsync`) and no longer reuses preview objects for final export traversal.
+- Out-of-process host now supports `--preview` and executes a reduced top-level traversal for faster scope selection.
+- Incremented application version to `0.0.39` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

@@ -33,7 +33,11 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
     }
 
     /// <inheritdoc />
-    public async Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken)
+    public async Task<TiaProjectTraversalResult> TraverseAsync(
+        string projectPath,
+        string? tiaInstallationPathOverride,
+        TiaTraversalDetailLevel detailLevel,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -91,7 +95,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
 
         try
         {
-            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, _logger, cancellationToken).ConfigureAwait(false);
+            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, detailLevel, _logger, cancellationToken).ConfigureAwait(false);
 
             if (response is null)
             {
@@ -271,10 +275,11 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         string hostPath,
         string projectPath,
         string installPath,
+        TiaTraversalDetailLevel detailLevel,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var arguments = BuildArguments(projectPath, installPath);
+        var arguments = BuildArguments(projectPath, installPath, detailLevel);
 
         var startInfo = new ProcessStartInfo
         {
@@ -390,11 +395,17 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         return true;
     }
 
-    private static string BuildArguments(string projectPath, string installPath)
+    private static string BuildArguments(string projectPath, string installPath, TiaTraversalDetailLevel detailLevel)
     {
         var builder = new StringBuilder();
         builder.Append("--project ").Append(Quote(projectPath)).Append(' ');
         builder.Append("--install ").Append(Quote(installPath));
+
+        if (detailLevel == TiaTraversalDetailLevel.Preview)
+        {
+            builder.Append(' ').Append("--preview");
+        }
+
         return builder.ToString();
     }
 

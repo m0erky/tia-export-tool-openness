@@ -21,6 +21,23 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
     /// <inheritdoc />
     public async Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken)
     {
+        return await BuildInventoryInternalAsync(projectPath, tiaInstallationPathOverride, TiaTraversalDetailLevel.Full, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<TiaProjectInventory> BuildInventoryPreviewAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken)
+    {
+        return await BuildInventoryInternalAsync(projectPath, tiaInstallationPathOverride, TiaTraversalDetailLevel.Preview, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<TiaProjectInventory> BuildInventoryInternalAsync(
+        string? projectPath,
+        string? tiaInstallationPathOverride,
+        TiaTraversalDetailLevel detailLevel,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (string.IsNullOrWhiteSpace(projectPath))
@@ -43,7 +60,9 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
 
         try
         {
-            traversal = await _opennessAdapter.TraverseAsync(projectPath, tiaInstallationPathOverride, cancellationToken).ConfigureAwait(false);
+            traversal = await _opennessAdapter
+                .TraverseAsync(projectPath, tiaInstallationPathOverride, detailLevel, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
