@@ -1,0 +1,312 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using TiaProjectExporter.Application.Abstractions;
+using TiaProjectExporter.Core.Models;
+
+namespace TiaProjectExporter.Tia.Inventory;
+
+/// <summary>
+/// Executes Siemens Openness traversal in a dedicated external host process.
+/// </summary>
+public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessAdapter
+{
+    private const string HostPathEnvironmentVariable = "TIA_EXPORTER_OPENNESS_HOST_PATH";
+    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private readonly ITiaInstallationDiscoveryService _installationDiscoveryService;
+    private readonly ILogger<OutOfProcessTiaProjectOpennessAdapter> _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OutOfProcessTiaProjectOpennessAdapter"/> class.
+    /// </summary>
+    public OutOfProcessTiaProjectOpennessAdapter(
+        ITiaInstallationDiscoveryService installationDiscoveryService,
+        ILogger<OutOfProcessTiaProjectOpennessAdapter> logger)
+    {
+        _installationDiscoveryService = installationDiscoveryService;
+        _logger = logger;
+    }
+
+    /// <inheritdoc />
+    public async Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var objects = new List<TiaProjectObjectNode>
+        {
+            new(
+                ObjectType: "Project",
+                Name: Path.GetFileNameWithoutExtension(projectPath),
+                QualifiedPath: "Project",
+                Depth: 0,
+                Metadata: new Dictionary<string, string>
+                {
+                    ["SourcePath"] = projectPath,
+                    ["TraversalMode"] = "OutOfProcess"
+                })
+        };
+
+        if (!OperatingSystem.IsWindows())
+        {
+            return BuildResult(projectPath, objects,
+            [
+                new ExportIssue(
+                    "OpennessHost",
+                    "Out-of-process Openness host is only supported on Windows.",
+                    "Run export on Windows with TIA Portal installed.")
+            ]);
+        }
+
+        var installations = await _installationDiscoveryService.DiscoverAsync(cancellationToken).ConfigureAwait(false);
+        var preferredInstallation = ResolvePreferredInstallation(installations, tiaInstallationPathOverride);
+
+        if (preferredInstallation is null || string.IsNullOrWhiteSpace(preferredInstallation.InstallPath))
+        {
+            return BuildResult(projectPath, objects,
+            [
+                new ExportIssue(
+                    "OpennessRuntime",
+                    "No supported TIA installation with Openness runtime metadata was detected.",
+                    "Install TIA Portal V18/V19/V20, or set manual installation override path.")
+            ]);
+        }
+
+        var hostPath = ResolveHostExecutablePath();
+
+        if (hostPath is null)
+        {
+            return BuildResult(projectPath, objects,
+            [
+                new ExportIssue(
+                    "OpennessHost",
+                    "Openness host executable was not found.",
+                    $"Set environment variable {HostPathEnvironmentVariable} or deploy TiaProjectExporter.OpennessHost.exe next to the UI executable.")
+            ]);
+        }
+
+        try
+        {
+            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, cancellationToken).ConfigureAwait(false);
+
+            if (response is null)
+            {
+                return BuildResult(projectPath, objects,
+                [
+                    new ExportIssue(
+                        "OpennessHost",
+                        "Openness host did not return a valid traversal response.",
+                        "Check host logs and EXPORT_FAILURE.log for details.")
+                ]);
+            }
+
+            var mappedObjects = response.Objects.Select(MapNode).ToArray();
+            var mappedIssues = response.Issues.Select(issue => new ExportIssue(issue.Scope ?? "OpennessTraversal", issue.Message ?? "Unknown issue", issue.Details)).ToArray();
+
+            return new TiaProjectTraversalResult(
+                ProjectName: string.IsNullOrWhiteSpace(response.ProjectName) ? Path.GetFileNameWithoutExtension(projectPath) : response.ProjectName,
+                ProjectPath: string.IsNullOrWhiteSpace(response.ProjectPath) ? projectPath : response.ProjectPath,
+                Objects: mappedObjects,
+                Issues: mappedIssues);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Out-of-process Openness traversal failed for project {ProjectPath}", projectPath);
+
+            return BuildResult(projectPath, objects,
+            [
+                new ExportIssue(
+                    "OpennessHost",
+                    "Out-of-process Openness traversal failed.",
+                    exception.ToString())
+            ]);
+        }
+    }
+
+    private static TiaProjectTraversalResult BuildResult(string projectPath, IReadOnlyList<TiaProjectObjectNode> objects, IReadOnlyList<ExportIssue> issues) =>
+        new(
+            ProjectName: Path.GetFileNameWithoutExtension(projectPath),
+            ProjectPath: projectPath,
+            Objects: objects,
+            Issues: issues);
+
+    private static TiaProjectObjectNode MapNode(HostObjectNode node) =>
+        new(
+            ObjectType: string.IsNullOrWhiteSpace(node.ObjectType) ? "UnmappedRuntimeNode" : node.ObjectType,
+            Name: string.IsNullOrWhiteSpace(node.Name) ? "Unnamed" : node.Name,
+            QualifiedPath: string.IsNullOrWhiteSpace(node.QualifiedPath) ? "Project/Unknown" : node.QualifiedPath,
+            Depth: node.Depth,
+            Metadata: node.Metadata ?? new Dictionary<string, string>());
+
+    private static DiscoveredTiaPortalInstallation? ResolvePreferredInstallation(
+        IReadOnlyList<DiscoveredTiaPortalInstallation> discoveredInstallations,
+        string? tiaInstallationPathOverride)
+    {
+        if (!string.IsNullOrWhiteSpace(tiaInstallationPathOverride))
+        {
+            var normalizedPath = tiaInstallationPathOverride.Trim().Trim('"');
+            var version = InferVersionFromPath(normalizedPath);
+
+            return new DiscoveredTiaPortalInstallation(
+                version,
+                $"Manual TIA Override ({version})",
+                normalizedPath,
+                OpennessAvailable: true);
+        }
+
+        return discoveredInstallations
+            .Where(installation => installation.OpennessAvailable && !string.IsNullOrWhiteSpace(installation.InstallPath))
+            .OrderByDescending(installation => installation.Version)
+            .FirstOrDefault();
+    }
+
+    private static TiaPortalVersion InferVersionFromPath(string installPath)
+    {
+        if (installPath.Contains("V18", StringComparison.OrdinalIgnoreCase)
+            || installPath.Contains("Portal V18", StringComparison.OrdinalIgnoreCase))
+        {
+            return TiaPortalVersion.V18;
+        }
+
+        if (installPath.Contains("V19", StringComparison.OrdinalIgnoreCase)
+            || installPath.Contains("Portal V19", StringComparison.OrdinalIgnoreCase))
+        {
+            return TiaPortalVersion.V19;
+        }
+
+        return TiaPortalVersion.V20;
+    }
+
+    private static string? ResolveHostExecutablePath()
+    {
+        var environmentPath = Environment.GetEnvironmentVariable(HostPathEnvironmentVariable);
+
+        if (!string.IsNullOrWhiteSpace(environmentPath) && File.Exists(environmentPath))
+        {
+            return environmentPath;
+        }
+
+        var baseDirectory = AppContext.BaseDirectory;
+        var directCandidate = Path.Combine(baseDirectory, "TiaProjectExporter.OpennessHost.exe");
+
+        if (File.Exists(directCandidate))
+        {
+            return directCandidate;
+        }
+
+        var nestedCandidate = Path.Combine(baseDirectory, "OpennessHost", "TiaProjectExporter.OpennessHost.exe");
+
+        return File.Exists(nestedCandidate)
+            ? nestedCandidate
+            : null;
+    }
+
+    private static async Task<HostTraversalResponse?> ExecuteHostAsync(
+        string hostPath,
+        string projectPath,
+        string installPath,
+        CancellationToken cancellationToken)
+    {
+        var arguments = BuildArguments(projectPath, installPath);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = hostPath,
+            Arguments = arguments,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(hostPath) ?? AppContext.BaseDirectory
+        };
+
+        using var process = new Process { StartInfo = startInfo };
+
+        if (!process.Start())
+        {
+            throw new InvalidOperationException("Failed to start Openness host process.");
+        }
+
+        var standardOutputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var standardErrorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+
+        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+        var standardOutput = await standardOutputTask.ConfigureAwait(false);
+        var standardError = await standardErrorTask.ConfigureAwait(false);
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Openness host exited with code {process.ExitCode}. STDERR: {standardError}");
+        }
+
+        if (string.IsNullOrWhiteSpace(standardOutput))
+        {
+            throw new InvalidOperationException("Openness host returned empty output.");
+        }
+
+        var response = JsonSerializer.Deserialize<HostTraversalResponse>(standardOutput, SerializerOptions);
+
+        if (response is null)
+        {
+            throw new InvalidOperationException("Failed to deserialize Openness host response.");
+        }
+
+        return response;
+    }
+
+    private static string BuildArguments(string projectPath, string installPath)
+    {
+        var builder = new StringBuilder();
+        builder.Append("--project ").Append(Quote(projectPath)).Append(' ');
+        builder.Append("--install ").Append(Quote(installPath));
+        return builder.ToString();
+    }
+
+    private static string Quote(string value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? "\"\""
+            : $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
+
+    private sealed class HostTraversalResponse
+    {
+        public string? ProjectName { get; set; }
+
+        public string? ProjectPath { get; set; }
+
+        public List<HostObjectNode> Objects { get; set; } = [];
+
+        public List<HostIssue> Issues { get; set; } = [];
+    }
+
+    private sealed class HostObjectNode
+    {
+        public string? ObjectType { get; set; }
+
+        public string? Name { get; set; }
+
+        public string? QualifiedPath { get; set; }
+
+        public int Depth { get; set; }
+
+        public Dictionary<string, string>? Metadata { get; set; }
+    }
+
+    private sealed class HostIssue
+    {
+        public string? Scope { get; set; }
+
+        public string? Message { get; set; }
+
+        public string? Details { get; set; }
+    }
+}

@@ -14,6 +14,8 @@
     <ProjectReference Include="..\TiaProjectExporter.Infrastructure\TiaProjectExporter.Infrastructure.csproj" />
     <ProjectReference Include="..\TiaProjectExporter.Tia\TiaProjectExporter.Tia.csproj" />
     <ProjectReference Include="..\TiaProjectExporter.Export\TiaProjectExporter.Export.csproj" />
+    <ProjectReference Include="..\TiaProjectExporter.OpennessHost\TiaProjectExporter.OpennessHost.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,4 +32,21 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="CopyOpennessHostArtifacts" AfterTargets="Build;Publish">
+    <ItemGroup>
+      <_OpennessHostArtifacts Include="..\TiaProjectExporter.OpennessHost\bin\$(Configuration)\net48\TiaProjectExporter.OpennessHost.exe" />
+      <_OpennessHostArtifacts Include="..\TiaProjectExporter.OpennessHost\bin\$(Configuration)\net48\TiaProjectExporter.OpennessHost.exe.config" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_OpennessHostArtifacts)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('%(Identity)')" />
+
+    <Copy SourceFiles="@(_OpennessHostArtifacts)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true"
+          Condition="'$(PublishDir)' != '' AND Exists('%(Identity)')" />
+  </Target>
 </Project>

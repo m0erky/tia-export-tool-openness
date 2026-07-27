@@ -21,7 +21,7 @@ TIA projects are rich but difficult to diff, inspect, and analyze outside TIA Po
 ## Current capabilities
 
 - Detects installed TIA versions (targeting V18/V19/V20) via Windows registry.
-- Uses Siemens Openness via reflection-safe adapter design.
+- Uses Siemens Openness via out-of-process host execution (`TiaProjectExporter.OpennessHost`, .NET Framework 4.8) to avoid .NET 8 in-process loader conflicts.
 - Exports traversal inventory and metadata into structured artifacts.
 - Generates analysis artifacts, including:
   - call graph
@@ -45,6 +45,7 @@ Solution projects:
 - `src/TiaProjectExporter.Application` — orchestration/use-cases
 - `src/TiaProjectExporter.Infrastructure` — file/serialization/infrastructure helpers
 - `src/TiaProjectExporter.Tia` — TIA discovery + Openness adapter + domain extractors
+- `src/TiaProjectExporter.OpennessHost` — isolated Siemens Openness runtime host (net48)
 - `src/TiaProjectExporter.Export` — export stages + analysis/report generation
 - `src/TiaProjectExporter.UI` — WPF MVVM desktop application
 - `tests/TiaProjectExporter.Tests` — xUnit tests
@@ -70,7 +71,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.3`
+- Current application version: `0.0.4`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -100,6 +101,8 @@ dotnet publish src/TiaProjectExporter.UI/TiaProjectExporter.UI.csproj -c Release
 ```
 
 If you hit `NETSDK1047` for `net8.0-windows/win-x64`, ensure publish restore runs with `-r win-x64` (or remove `--no-restore` and let publish restore with runtime).
+
+Note: publish output now includes `TiaProjectExporter.OpennessHost.exe` (net48), which is required for stable Siemens Openness execution.
 
 Windows validation workflow artifacts:
 
@@ -230,6 +233,10 @@ Current keys:
 - **Export aborts and no log appears in output**
   - The UI now writes `Export/Reports/EXPORT_FAILURE.log` on command/export failures, including exception stack and UI log snapshot.
   - Application-level crashes are additionally written under `%LocalAppData%/TiaProjectExporter/CrashLogs`.
+
+- **`Siemens.Engineering.Contract` / `MissingMethodException` crashes**
+  - The exporter now executes Openness in a separate host process (`TiaProjectExporter.OpennessHost.exe`, .NET Framework 4.8) to avoid .NET 8 in-process loader incompatibilities.
+  - Ensure the host executable is deployed beside the UI executable (or set environment variable `TIA_EXPORTER_OPENNESS_HOST_PATH`).
   - Custom corporate installations may still require registry policy exceptions.
 
 ## Development workflow note

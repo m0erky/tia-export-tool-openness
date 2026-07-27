@@ -32,7 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITiaDomainExtractor, PlcTagDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, PlcDataTypeDomainExtractor>();
         services.AddSingleton<ITiaDomainExtractor, HmiDomainExtractor>();
-        services.AddSingleton<ITiaProjectOpennessAdapter, ReflectionTiaProjectOpennessAdapter>();
+        services.AddSingleton<ITiaProjectOpennessAdapter, OutOfProcessTiaProjectOpennessAdapter>();
         services.AddSingleton<ITiaProjectInventoryProvider, OpennessBackedTiaProjectInventoryProvider>();
         return services;
     }

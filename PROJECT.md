@@ -16,6 +16,9 @@ The solution follows clean architecture with clear dependency flow toward the do
 - `TiaProjectExporter.Tia`
   - Siemens TIA Portal Openness integration, installed-version detection, project traversal, and API adapters.
   - Depends on `Application` and `Core`.
+- `TiaProjectExporter.OpennessHost`
+  - Dedicated out-of-process Siemens runtime host targeting .NET Framework 4.8 to isolate Openness assembly loading from the .NET 8 UI process.
+  - Invoked by `TiaProjectExporter.Tia` via process boundary and JSON payload exchange.
 - `TiaProjectExporter.Export`
   - Repository layout builder, export packaging, summary generation, and AI-oriented output composition.
   - Depends on `Application`, `Infrastructure`, and `Core`.
@@ -36,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.3**
+Version baseline for this milestone: **0.0.4**
 
 Scope:
 
@@ -194,6 +197,12 @@ Scope:
 - Incremented application version to `0.0.2` in central build metadata and version fallback logic.
 - Added explicit UI runtime identifier targeting (`win-x64`) to prevent `NETSDK1047` during self-contained Windows publish.
 - Incremented application version to `0.0.3` in central build metadata.
+- Added a dedicated out-of-process Siemens Openness host project (`TiaProjectExporter.OpennessHost`, net48) to execute runtime traversal in a CLR-compatible process.
+- Implemented `OutOfProcessTiaProjectOpennessAdapter` and switched DI registration to host-process traversal by default.
+- Added host executable discovery (`TIA_EXPORTER_OPENNESS_HOST_PATH` env var or colocated host exe) with explicit diagnostics when host deployment is missing.
+- Added packaging integration so UI build/publish copies `TiaProjectExporter.OpennessHost.exe` and `.config` into output directories.
+- Added Linux-safe unit test coverage for out-of-process adapter non-Windows behavior.
+- Incremented application version to `0.0.4` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
@@ -207,6 +216,7 @@ Scope:
 - Manual override V20 path detection is heuristic (`V20`/`PublicAPI/V20`) and should be cross-validated against broader enterprise install layouts.
 - Source project browse currently uses file picker workflow; directory-style `.apXX` project selection still relies on manual path input.
 - Linux-based automated test environment still cannot validate WPF runtime crash-path handling; verify new diagnostics files on Windows runtime failures.
+- Out-of-process host is currently .NET Framework 4.8 only and requires appropriate runtime/tooling on Windows build and execution hosts.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.
@@ -253,6 +263,13 @@ Expected local build commands:
 dotnet restore
 dotnet build TiaProjectExporter.sln
 dotnet test TiaProjectExporter.sln
+```
+
+Windows publish for UI + host:
+
+```powershell
+dotnet restore src/TiaProjectExporter.UI/TiaProjectExporter.UI.csproj -r win-x64
+dotnet publish src/TiaProjectExporter.UI/TiaProjectExporter.UI.csproj -c Release -r win-x64 --self-contained true
 ```
 
 SDK pinning:
