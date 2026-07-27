@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.30`
+- Current application version: `0.0.31`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -89,6 +89,7 @@ If build complains about SDK mismatch, install that SDK first.
 - Content-first object serialization: per-object JSON/XML/Markdown now suppresses verbose `Prop.*` and raw `Content.*` blobs to reduce metadata noise; deep content remains available in sidecar files.
 - Bundle-first export: inventory objects are now grouped into domain/type bundle files (`Export/<Domain>/Bundles/<ObjectType>.*`) to drastically reduce file count while keeping deep content (source/XML) in each bundle.
 - Duplicate-path hardening: analytics stages now deduplicate repeated inventory IDs/paths before dictionary materialization, preventing `An item with the same key has already been added` failures on large multi-entry traversals.
+- Source extraction hardening: host now tries source-oriented runtime methods (`GenerateSource/GetSource/GetText/...`) and XML-content parsing fallback (`Source/StatementList/Implementation/...`) so bundle exports contain readable code whenever Openness exposes it.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 

@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.30**
+Version baseline for this milestone: **0.0.31**
 
 Scope:
 
@@ -280,6 +280,9 @@ Scope:
 - Incremented application version to `0.0.29` in central build metadata and UI fallback version resolution.
 - Fixed duplicate-key crashes in `TypedExtractorBacklogStage` and `ObjectUsageAnalysisStage` by deduplicating/grouping repeated inventory IDs/paths before dictionary creation.
 - Incremented application version to `0.0.30` in central build metadata and UI fallback version resolution.
+- Extended host deep-content extraction with source-oriented method probing (`GenerateSource`, `GetSource`, `GetText`, etc.) before XML fallback.
+- Added XML content parsing fallback for source-like elements (`Source`, `StatementList`, `Implementation`, `Code`, etc.) to derive readable code text when direct source fields are not exposed.
+- Incremented application version to `0.0.31` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

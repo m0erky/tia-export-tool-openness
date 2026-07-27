@@ -1162,10 +1162,21 @@ internal static class Program
             });
         }
 
-        if (TryExtractSourceText(runtimeNode, out var sourceText))
+        if (TryExtractSourceText(runtimeNode, out var sourceText)
+            || TryExtractSourceViaMethods(runtimeNode, out sourceText))
         {
             metadata["Content.SourceText"] = sourceText;
             metadata["Content.SourceTextLength"] = sourceText.Length.ToString();
+            return;
+        }
+
+        if (metadata.TryGetValue("Content.ExportXml", out var xml)
+            && !string.IsNullOrWhiteSpace(xml)
+            && TryExtractSourceTextFromExportXml(xml, out var extractedFromXml))
+        {
+            metadata["Content.SourceText"] = extractedFromXml;
+            metadata["Content.SourceTextLength"] = extractedFromXml.Length.ToString();
+            metadata["Content.SourceOrigin"] = "ExportXml";
         }
     }
 
@@ -1297,6 +1308,129 @@ internal static class Program
         }
 
         return false;
+    }
+
+    private static bool TryExtractSourceViaMethods(object runtimeNode, out string sourceText)
+    {
+        sourceText = string.Empty;
+
+        var methodCandidates = new[]
+        {
+            "GenerateSource",
+            "GetSource",
+            "GetText",
+            "ToText",
+            "CreateSource",
+            "ExportToString"
+        };
+
+        var methods = runtimeNode.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(method => method.ReturnType == typeof(string) && method.GetParameters().Length == 0)
+            .ToArray();
+
+        foreach (var candidate in methodCandidates)
+        {
+            var method = methods.FirstOrDefault(item => string.Equals(item.Name, candidate, StringComparison.OrdinalIgnoreCase));
+            if (method is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                var value = method.Invoke(runtimeNode, Array.Empty<object>()) as string;
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                sourceText = value;
+                return true;
+            }
+            catch
+            {
+                // Ignore and continue probing.
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryExtractSourceTextFromExportXml(string xml, out string sourceText)
+    {
+        sourceText = string.Empty;
+
+        try
+        {
+            var document = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
+
+            var preferredElementNames = new[]
+            {
+                "Source",
+                "SourceText",
+                "STSource",
+                "SCLSource",
+                "StatementList",
+                "StructuredText",
+                "Code",
+                "NetworkSource",
+                "Implementation"
+            };
+
+            foreach (var name in preferredElementNames)
+            {
+                var matches = document
+                    .Descendants()
+                    .Where(element => element.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    .Select(element => NormalizeSourceText(element.Value))
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .ToArray();
+
+                if (matches.Length > 0)
+                {
+                    sourceText = string.Join(Environment.NewLine + Environment.NewLine, matches.Distinct(StringComparer.Ordinal));
+                    return true;
+                }
+            }
+
+            var fallbackTextNodes = document
+                .Descendants()
+                .Select(element => NormalizeSourceText(element.Value))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Where(value => value.Length >= 20)
+                .Distinct(StringComparer.Ordinal)
+                .Take(300)
+                .ToArray();
+
+            if (fallbackTextNodes.Length == 0)
+            {
+                return false;
+            }
+
+            sourceText = string.Join(Environment.NewLine, fallbackTextNodes);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string NormalizeSourceText(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return string.Empty;
+        }
+
+        var lines = raw
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n')
+            .Select(line => line.TrimEnd())
+            .ToArray();
+
+        return string.Join(Environment.NewLine, lines).Trim();
     }
 
     private static bool TryConvertScalarToString(object? value, out string serialized)
