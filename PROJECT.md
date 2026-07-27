@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.31**
+Version baseline for this milestone: **0.0.32**
 
 Scope:
 
@@ -285,6 +285,10 @@ Scope:
 - Incremented application version to `0.0.31` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
+- Hardened deep content export according to Siemens Openness export/import guidance by trying multiple `Export(...)` overloads and preferring `FileInfo + ExportOptions.WithDefaults` when available.
+- Extended PLC model traversal with explicit collections (`BlockGroup`, `TagTableGroup`, `TypeGroup`, `TechnologyObjects`, `ExternalSources`, `Sources`) to improve extraction coverage of blocks/tags/types/sources.
+- Tightened PLC runtime filtering to keep export bundles focused on engineering-relevant software objects and reduce low-value object noise.
+- Incremented application version to `0.0.32` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

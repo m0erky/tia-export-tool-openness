@@ -8,6 +8,7 @@ using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Xml.Linq;
 
 namespace TiaProjectExporter.OpennessHost;
 
@@ -552,7 +553,7 @@ internal static class Program
 
             var childrenAdded = 0;
 
-            foreach (var child in EnumeratePlcChildObjects(current.Node, current.Path, issues))
+            foreach (var candidate in EnumeratePlcTraversalCandidates(current.Node, current.Path, issues))
             {
                 if (childrenAdded >= MaxChildrenPerNode)
                 {
@@ -565,9 +566,14 @@ internal static class Program
                     break;
                 }
 
+                var child = candidate.Node;
                 var childName = TryReadString(child, "Name") ?? TryReadString(child, "DisplayName") ?? child.GetType().Name;
-                var childPath = $"{current.Path}/{childName}";
-                var objectType = ClassifyPlcObjectType(child, childPath);
+                var childPath = string.IsNullOrWhiteSpace(candidate.Path)
+                    ? $"{current.Path}/{childName}"
+                    : candidate.Path!;
+                var objectType = string.IsNullOrWhiteSpace(candidate.ObjectType)
+                    ? ClassifyPlcObjectType(child, childPath)
+                    : candidate.ObjectType!;
                 var dedupKey = $"{objectType}|{childPath}";
 
                 if (!visited.Add(dedupKey))
@@ -586,7 +592,7 @@ internal static class Program
                     Name = childName,
                     QualifiedPath = childPath,
                     Depth = current.Depth + 1,
-                    Metadata = BuildNodeMetadata(child, "HostReflectionPlcFocus", childPath, issues)
+                    Metadata = BuildNodeMetadata(child, candidate.Strategy ?? "HostReflectionPlcFocus", childPath, issues)
                 };
 
                 objects.Add(hostNode);
@@ -596,6 +602,182 @@ internal static class Program
                 childrenAdded++;
                 queue.Enqueue((child, childPath, current.Depth + 1));
             }
+        }
+    }
+
+    private static IEnumerable<PlcTraversalCandidate> EnumeratePlcTraversalCandidates(object parent, string parentPath, ICollection<HostIssue> issues)
+    {
+        foreach (var explicitCandidate in EnumeratePlcModelChildren(parent, parentPath, issues))
+        {
+            yield return explicitCandidate;
+        }
+
+        foreach (var child in EnumeratePlcChildObjects(parent, parentPath, issues))
+        {
+            yield return new PlcTraversalCandidate(child, null, null, "HostReflectionPlcFocus");
+        }
+    }
+
+    private static IEnumerable<PlcTraversalCandidate> EnumeratePlcModelChildren(object parent, string parentPath, ICollection<HostIssue> issues)
+    {
+        var parentTypeName = parent.GetType().FullName ?? parent.GetType().Name;
+
+        var blockGroup = TryReadObjectProperty(parent, "BlockGroup");
+        if (blockGroup is not null)
+        {
+            var blockGroupPath = $"{parentPath}/BlockGroup";
+            yield return new PlcTraversalCandidate(blockGroup, blockGroupPath, "BlockGroup", "HostPlcModel");
+
+            foreach (var block in EnumerateCollectionProperty(blockGroup, "Blocks", issues, blockGroupPath))
+            {
+                var blockName = TryReadString(block, "Name") ?? block.GetType().Name;
+                var blockPath = $"{blockGroupPath}/Blocks/{blockName}";
+                yield return new PlcTraversalCandidate(block, blockPath, ClassifyPlcObjectType(block, blockPath), "HostPlcModel");
+            }
+
+            foreach (var subgroup in EnumerateCollectionProperty(blockGroup, "Groups", issues, blockGroupPath))
+            {
+                var groupName = TryReadString(subgroup, "Name") ?? subgroup.GetType().Name;
+                var groupPath = $"{blockGroupPath}/Groups/{groupName}";
+                yield return new PlcTraversalCandidate(subgroup, groupPath, "BlockGroup", "HostPlcModel");
+            }
+        }
+
+        var tagTableGroup = TryReadObjectProperty(parent, "TagTableGroup");
+        if (tagTableGroup is not null)
+        {
+            var groupPath = $"{parentPath}/TagTableGroup";
+            yield return new PlcTraversalCandidate(tagTableGroup, groupPath, "TagTableGroup", "HostPlcModel");
+
+            foreach (var table in EnumerateCollectionProperty(tagTableGroup, "TagTables", issues, groupPath))
+            {
+                var tableName = TryReadString(table, "Name") ?? table.GetType().Name;
+                var tablePath = $"{groupPath}/TagTables/{tableName}";
+                yield return new PlcTraversalCandidate(table, tablePath, "TagTable", "HostPlcModel");
+            }
+        }
+
+        var typeGroup = TryReadObjectProperty(parent, "TypeGroup") ?? TryReadObjectProperty(parent, "PlcTypeGroup");
+        if (typeGroup is not null)
+        {
+            var groupPath = $"{parentPath}/TypeGroup";
+            yield return new PlcTraversalCandidate(typeGroup, groupPath, "TypeGroup", "HostPlcModel");
+
+            foreach (var type in EnumerateCollectionProperty(typeGroup, "Types", issues, groupPath))
+            {
+                var typeName = TryReadString(type, "Name") ?? type.GetType().Name;
+                var typePath = $"{groupPath}/Types/{typeName}";
+                yield return new PlcTraversalCandidate(type, typePath, ClassifyPlcObjectType(type, typePath), "HostPlcModel");
+            }
+        }
+
+        foreach (var technology in EnumerateCollectionProperty(parent, "TechnologyObjects", issues, parentPath))
+        {
+            var technologyName = TryReadString(technology, "Name") ?? technology.GetType().Name;
+            var technologyPath = $"{parentPath}/TechnologyObjects/{technologyName}";
+            yield return new PlcTraversalCandidate(technology, technologyPath, "TechnologyObject", "HostPlcModel");
+        }
+
+        foreach (var source in EnumerateCollectionProperty(parent, "ExternalSources", issues, parentPath))
+        {
+            var sourceName = TryReadString(source, "Name") ?? source.GetType().Name;
+            var sourcePath = $"{parentPath}/ExternalSources/{sourceName}";
+            yield return new PlcTraversalCandidate(source, sourcePath, "Source", "HostPlcModel");
+        }
+
+        foreach (var source in EnumerateCollectionProperty(parent, "Sources", issues, parentPath))
+        {
+            var sourceName = TryReadString(source, "Name") ?? source.GetType().Name;
+            var sourcePath = $"{parentPath}/Sources/{sourceName}";
+            yield return new PlcTraversalCandidate(source, sourcePath, "Source", "HostPlcModel");
+        }
+
+        if (ContainsAny(parentTypeName, "PlcBlockUserGroup", "BlockGroup"))
+        {
+            foreach (var nestedBlock in EnumerateCollectionProperty(parent, "Blocks", issues, parentPath))
+            {
+                var blockName = TryReadString(nestedBlock, "Name") ?? nestedBlock.GetType().Name;
+                var blockPath = $"{parentPath}/Blocks/{blockName}";
+                yield return new PlcTraversalCandidate(nestedBlock, blockPath, ClassifyPlcObjectType(nestedBlock, blockPath), "HostPlcModel");
+            }
+
+            foreach (var nestedGroup in EnumerateCollectionProperty(parent, "Groups", issues, parentPath))
+            {
+                var groupName = TryReadString(nestedGroup, "Name") ?? nestedGroup.GetType().Name;
+                var groupPath = $"{parentPath}/Groups/{groupName}";
+                yield return new PlcTraversalCandidate(nestedGroup, groupPath, "BlockGroup", "HostPlcModel");
+            }
+        }
+    }
+
+    private static object? TryReadObjectProperty(object source, string propertyName)
+    {
+        var property = source.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+        if (property is null || !property.CanRead || property.GetIndexParameters().Length > 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var value = property.GetValue(source);
+            if (value is null || IsSimpleValue(value.GetType()))
+            {
+                return null;
+            }
+
+            return value;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static IEnumerable<object> EnumerateCollectionProperty(object source, string propertyName, ICollection<HostIssue> issues, string sourcePath)
+    {
+        var property = source.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+        if (property is null || !property.CanRead || property.GetIndexParameters().Length > 0)
+        {
+            yield break;
+        }
+
+        object? value;
+        try
+        {
+            value = property.GetValue(source);
+        }
+        catch (Exception exception)
+        {
+            issues.Add(new HostIssue
+            {
+                Scope = "OpennessTraversal",
+                Message = "Collection property access failed during PLC model traversal.",
+                Details = $"Node: {sourcePath}; Property: {propertyName}; {DescribeException(exception)}"
+            });
+            yield break;
+        }
+
+        if (value is not IEnumerable enumerable || value is string)
+        {
+            yield break;
+        }
+
+        var count = 0;
+        foreach (var item in enumerable)
+        {
+            count++;
+            if (count > MaxItemsPerEnumerableProperty)
+            {
+                yield break;
+            }
+
+            if (item is null || IsSimpleValue(item.GetType()))
+            {
+                continue;
+            }
+
+            yield return item;
         }
     }
 
@@ -1199,51 +1381,106 @@ internal static class Program
         xmlContent = string.Empty;
         error = null;
 
-        var nodeType = runtimeNode.GetType();
-        var exportMethod = nodeType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(method =>
+        var exportMethods = runtimeNode.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(method => string.Equals(method.Name, "Export", StringComparison.OrdinalIgnoreCase))
+            .Where(method =>
             {
-                if (!string.Equals(method.Name, "Export", StringComparison.OrdinalIgnoreCase))
+                var parameters = method.GetParameters();
+                if (parameters.Length < 1 || parameters.Length > 2)
                 {
                     return false;
                 }
 
-                var parameters = method.GetParameters();
-                return parameters.Length == 1
-                    && (parameters[0].ParameterType == typeof(FileInfo)
-                        || parameters[0].ParameterType == typeof(string));
-            });
+                return parameters[0].ParameterType == typeof(FileInfo)
+                    || parameters[0].ParameterType == typeof(string);
+            })
+            .OrderByDescending(method => method.GetParameters()[0].ParameterType == typeof(FileInfo))
+            .ThenByDescending(method => method.GetParameters().Length == 2)
+            .ToArray();
 
-        if (exportMethod is null)
+        if (exportMethods.Length == 0)
         {
             return false;
         }
+
+        var errors = new List<string>();
+
+        foreach (var exportMethod in exportMethods)
+        {
+            if (TryExportWithMethod(runtimeNode, exportMethod, out xmlContent, out var methodError))
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(methodError))
+            {
+                errors.Add(methodError);
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            error = string.Join(" | ", errors.Distinct(StringComparer.Ordinal));
+        }
+
+        return false;
+    }
+
+    private static bool TryExportWithMethod(object runtimeNode, MethodInfo exportMethod, out string xmlContent, out string? error)
+    {
+        xmlContent = string.Empty;
+        error = null;
 
         var extension = ".xml";
         var tempPath = Path.Combine(Path.GetTempPath(), $"tia-exporter-{Guid.NewGuid():N}{extension}");
 
         try
         {
-            var parameterType = exportMethod.GetParameters()[0].ParameterType;
-            object argument = parameterType == typeof(FileInfo)
+            var parameters = exportMethod.GetParameters();
+            var firstParameterType = parameters[0].ParameterType;
+
+            object argument = firstParameterType == typeof(FileInfo)
                 ? (object)new FileInfo(tempPath)
                 : tempPath;
 
-            var arguments = new object[] { argument };
+            object[] arguments;
+            if (parameters.Length == 1)
+            {
+                arguments = new object[] { argument };
+            }
+            else
+            {
+                var optionsArgument = ResolveExportOptionsArgument(parameters[1].ParameterType);
+                if (optionsArgument is null)
+                {
+                    error = $"Method {exportMethod.Name} has unsupported options type '{parameters[1].ParameterType.FullName}'.";
+                    return false;
+                }
+
+                arguments = new[] { argument, optionsArgument };
+            }
+
             _ = exportMethod.Invoke(runtimeNode, arguments);
 
             if (!File.Exists(tempPath))
             {
-                error = "Export method executed but produced no output file.";
+                error = $"Method {exportMethod} executed but produced no output file.";
                 return false;
             }
 
             xmlContent = File.ReadAllText(tempPath);
-            return !string.IsNullOrWhiteSpace(xmlContent);
+            if (string.IsNullOrWhiteSpace(xmlContent))
+            {
+                error = $"Method {exportMethod} produced an empty XML file.";
+                return false;
+            }
+
+            return true;
         }
         catch (Exception exception)
         {
-            error = DescribeException(exception);
+            error = $"Method {exportMethod} failed: {DescribeException(exception)}";
             return false;
         }
         finally
@@ -1259,6 +1496,40 @@ internal static class Program
             {
                 // Best effort cleanup only.
             }
+        }
+    }
+
+    private static object? ResolveExportOptionsArgument(Type optionsType)
+    {
+        try
+        {
+            if (optionsType.IsEnum)
+            {
+                if (Enum.GetNames(optionsType).Any(name => string.Equals(name, "WithDefaults", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return Enum.Parse(optionsType, "WithDefaults", ignoreCase: true);
+                }
+
+                return Activator.CreateInstance(optionsType);
+            }
+
+            var defaultsField = optionsType.GetField("WithDefaults", BindingFlags.Public | BindingFlags.Static);
+            if (defaultsField is not null)
+            {
+                return defaultsField.GetValue(null);
+            }
+
+            var defaultsProperty = optionsType.GetProperty("WithDefaults", BindingFlags.Public | BindingFlags.Static);
+            if (defaultsProperty is not null)
+            {
+                return defaultsProperty.GetValue(null);
+            }
+
+            return Activator.CreateInstance(optionsType);
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -1592,10 +1863,15 @@ internal static class Program
             return true;
         }
 
-        return path.Contains("Software", StringComparison.OrdinalIgnoreCase)
-            || path.Contains("Blocks", StringComparison.OrdinalIgnoreCase)
-            || path.Contains("Tag", StringComparison.OrdinalIgnoreCase)
-            || path.Contains("DataType", StringComparison.OrdinalIgnoreCase);
+        return path.Contains("/BlockGroup", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/Blocks/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/TagTableGroup", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/TagTables/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/TypeGroup", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/Types/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/TechnologyObjects/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/ExternalSources/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/Sources/", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool ContainsAny(string candidate, params string[] terms) =>
@@ -1830,6 +2106,25 @@ internal sealed class HostOptions
 
         return null;
     }
+}
+
+internal sealed class PlcTraversalCandidate
+{
+    public PlcTraversalCandidate(object node, string? path, string? objectType, string? strategy)
+    {
+        Node = node;
+        Path = path;
+        ObjectType = objectType;
+        Strategy = strategy;
+    }
+
+    public object Node { get; }
+
+    public string? Path { get; }
+
+    public string? ObjectType { get; }
+
+    public string? Strategy { get; }
 }
 
 internal sealed class ReferenceEqualityComparer : IEqualityComparer<object>

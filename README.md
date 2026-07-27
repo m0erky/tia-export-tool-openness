@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.31`
+- Current application version: `0.0.32`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -85,11 +85,12 @@ If build complains about SDK mismatch, install that SDK first.
 - PLC discovery hardening: out-of-process host now performs a dedicated PLC-focused traversal pass over software/block/tag/datatype candidate properties to improve discovery of `OB`/`FB`/`FC`/`DB`/`InstanceDB`/`Tag`/`UDT` objects.
 - Metadata depth hardening: host now extracts bounded scalar runtime properties per discovered object (`Prop.*`) to capture more configuration/settings data while guarding performance with limits.
 - PLC entry-point hardening: host now probes Siemens `GetService(...)` software-container services while traversing device nodes to discover PLC software trees that are not directly exposed via plain public properties.
-- Deep content export: host now attempts `Export(FileInfo)` extraction for software/runtime nodes and captures discovered source-like text fields; object-export stage writes these into sidecar files (`*.content.export.xml`, `*.content.source.*`).
+- Deep content export: host now attempts multiple reflective `Export(...)` overloads (including Siemens `ExportOptions.WithDefaults`) for software/runtime nodes and captures discovered source-like text fields for bundle export.
 - Content-first object serialization: per-object JSON/XML/Markdown now suppresses verbose `Prop.*` and raw `Content.*` blobs to reduce metadata noise; deep content remains available in sidecar files.
 - Bundle-first export: inventory objects are now grouped into domain/type bundle files (`Export/<Domain>/Bundles/<ObjectType>.*`) to drastically reduce file count while keeping deep content (source/XML) in each bundle.
 - Duplicate-path hardening: analytics stages now deduplicate repeated inventory IDs/paths before dictionary materialization, preventing `An item with the same key has already been added` failures on large multi-entry traversals.
 - Source extraction hardening: host now tries source-oriented runtime methods (`GenerateSource/GetSource/GetText/...`) and XML-content parsing fallback (`Source/StatementList/Implementation/...`) so bundle exports contain readable code whenever Openness exposes it.
+- PLC model traversal hardening: host now explicitly traverses PLC model collections (`BlockGroup`, `TagTableGroup`, `TypeGroup`, `TechnologyObjects`, `ExternalSources`, `Sources`) to increase hit rate for real PLC engineering content.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
