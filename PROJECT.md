@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.33**
+Version baseline for this milestone: **0.0.34**
 
 Scope:
 
@@ -293,6 +293,11 @@ Scope:
   - nullable flow warnings in error/source assignment (`CS8604`, `CS8601`)
   - removed unsupported `string.Replace` overload with `StringComparison` for .NET Framework (`CS1501`)
 - Incremented application version to `0.0.33` in central build metadata and UI fallback version resolution.
+- Fixed heartbeat monitoring pipeline in UI:
+  - ensured `UiLoggerProvider` is registered in logging configuration pipeline
+  - made heartbeat parsing tolerant for both `HostHeartbeat|...` and raw `HB|...` log payloads
+  - added timestamp parsing fallback to avoid stuck "Waiting for first heartbeat" state on format deviations
+- Incremented application version to `0.0.34` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

@@ -1,7 +1,8 @@
 using System.Collections.ObjectModel;
-using System.Text;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 using TiaProjectExporter.Application.Abstractions;
@@ -899,7 +900,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.33";
+            return "0.0.34";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
@@ -931,23 +932,49 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         var markerIndex = entry.IndexOf("HostHeartbeat|", StringComparison.Ordinal);
 
-        if (markerIndex < 0)
+        if (markerIndex >= 0)
+        {
+            var payload = entry[(markerIndex + "HostHeartbeat|".Length)..];
+            TryApplyHeartbeatPayload(payload);
+            return;
+        }
+
+        markerIndex = entry.IndexOf("HB|", StringComparison.Ordinal);
+
+        if (markerIndex >= 0)
+        {
+            var payload = entry[(markerIndex + "HB|".Length)..];
+            TryApplyHeartbeatPayload(payload);
+        }
+    }
+
+    private void TryApplyHeartbeatPayload(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
         {
             return;
         }
 
-        var payload = entry[(markerIndex + "HostHeartbeat|".Length)..];
-        var parts = payload.Split('|');
+        var parts = payload.Split('|', 4);
 
-        if (parts.Length < 4)
+        if (parts.Length == 0)
         {
             return;
         }
 
-        if (DateTimeOffset.TryParse(parts[0], out var timestamp))
+        if (DateTimeOffset.TryParse(parts[0], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var timestamp))
         {
             _lastHostHeartbeatUtc = timestamp;
+            return;
         }
+
+        if (DateTimeOffset.TryParse(parts[0], out timestamp))
+        {
+            _lastHostHeartbeatUtc = timestamp;
+            return;
+        }
+
+        _lastHostHeartbeatUtc = DateTimeOffset.UtcNow;
     }
 
     private void OnHostHeartbeatTimerTick(object? sender, EventArgs e)

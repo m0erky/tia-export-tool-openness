@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.33`
+- Current application version: `0.0.34`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -91,6 +91,7 @@ If build complains about SDK mismatch, install that SDK first.
 - Duplicate-path hardening: analytics stages now deduplicate repeated inventory IDs/paths before dictionary materialization, preventing `An item with the same key has already been added` failures on large multi-entry traversals.
 - Source extraction hardening: host now tries source-oriented runtime methods (`GenerateSource/GetSource/GetText/...`) and XML-content parsing fallback (`Source/StatementList/Implementation/...`) so bundle exports contain readable code whenever Openness exposes it.
 - PLC model traversal hardening: host now explicitly traverses PLC model collections (`BlockGroup`, `TagTableGroup`, `TypeGroup`, `TechnologyObjects`, `ExternalSources`, `Sources`) to increase hit rate for real PLC engineering content.
+- Heartbeat reliability hardening: UI logging provider is now registered directly in logging configuration and heartbeat parsing accepts both `HostHeartbeat|...` and raw `HB|...` payloads.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 

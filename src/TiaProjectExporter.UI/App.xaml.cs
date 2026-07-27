@@ -55,7 +55,6 @@ public partial class App : System.Windows.Application
                     services.AddExportServices();
 
                     services.AddSingleton<UiLogCollector>();
-                    services.AddSingleton<ILoggerProvider, UiLoggerProvider>();
                     services.AddSingleton<MainWindowViewModel>();
                     services.AddSingleton<MainWindow>();
                 })
@@ -64,6 +63,7 @@ public partial class App : System.Windows.Application
                     logging.ClearProviders();
                     logging.AddConfiguration(context.Configuration.GetSection("Logging"));
                     logging.AddConsole();
+                    logging.Services.AddSingleton<ILoggerProvider, UiLoggerProvider>();
                 })
                 .Build();
 
