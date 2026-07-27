@@ -68,10 +68,14 @@ public sealed class TypedExtractorBacklogStage : IExportStage
         var nodeNames = nodes.Select(node => node.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var unresolvedEdgeCountBySourcePath = nodes
+            .GroupBy(node => node.QualifiedPath, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
-                node => node.QualifiedPath,
-                node => ParseRelationships(node.Metadata)
-                    .Count(relation => !RelationshipTargetResolver.IsResolvedTarget(relation.Target, nodeIds, nodeNames)),
+                group => group.Key,
+                group => group
+                    .Select(node => ParseRelationships(node.Metadata)
+                        .Count(relation => !RelationshipTargetResolver.IsResolvedTarget(relation.Target, nodeIds, nodeNames)))
+                    .DefaultIfEmpty(0)
+                    .Max(),
                 StringComparer.OrdinalIgnoreCase);
 
         var candidates = nodes

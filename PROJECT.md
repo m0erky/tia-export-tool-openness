@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.29**
+Version baseline for this milestone: **0.0.30**
 
 Scope:
 
@@ -278,6 +278,8 @@ Scope:
 - Bundle artifacts now carry deeper payloads (including source and export XML content sections) so fewer files still retain actionable engineering content.
 - Updated unit tests for bundle-based output assertions.
 - Incremented application version to `0.0.29` in central build metadata and UI fallback version resolution.
+- Fixed duplicate-key crashes in `TypedExtractorBacklogStage` and `ObjectUsageAnalysisStage` by deduplicating/grouping repeated inventory IDs/paths before dictionary creation.
+- Incremented application version to `0.0.30` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

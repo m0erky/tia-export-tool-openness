@@ -61,6 +61,8 @@ public sealed class ObjectUsageAnalysisStage : IExportStage
     {
         var objects = inventory.Objects
             .Select(node => new Node(node, BuildNodeId(node)))
+            .GroupBy(node => node.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => SelectPreferredNode(group))
             .ToArray();
 
         var byId = objects.ToDictionary(item => item.Id, item => item, StringComparer.OrdinalIgnoreCase);
@@ -235,6 +237,14 @@ public sealed class ObjectUsageAnalysisStage : IExportStage
 
         return node.ObjectType.Equals("OB", StringComparison.OrdinalIgnoreCase)
             || node.Name.Contains("Main", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Node SelectPreferredNode(IEnumerable<Node> candidates)
+    {
+        return candidates
+            .OrderByDescending(candidate => candidate.Source.Metadata?.Count ?? 0)
+            .ThenByDescending(candidate => candidate.Source.Depth)
+            .First();
     }
 
     private sealed record Node(TiaProjectObjectNode Source, string Id);
