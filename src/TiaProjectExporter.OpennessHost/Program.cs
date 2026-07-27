@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -10,6 +11,11 @@ namespace TiaProjectExporter.OpennessHost;
 
 internal static class Program
 {
+    private const int MaxTraversalDepth = 6;
+    private const int MaxChildrenPerNode = 2000;
+    private const int MaxItemsPerEnumerableProperty = 1000;
+    private static readonly TimeSpan SlowPropertyThreshold = TimeSpan.FromSeconds(2);
+
     private static HeartbeatSession? _heartbeatSession;
 
     private static int Main(string[] args)
@@ -442,13 +448,27 @@ internal static class Program
                 _heartbeatSession?.UpdatePhase("TraverseQueue", $"{current.Path} (depth {current.Depth})");
             }
 
-            if (current.Depth > 6)
+            if (current.Depth > MaxTraversalDepth)
             {
                 continue;
             }
 
-            foreach (var child in EnumerateChildObjects(current.Node))
+            var childrenAddedForNode = 0;
+            var nodeTraversalTimer = Stopwatch.StartNew();
+
+            foreach (var child in EnumerateChildObjects(current.Node, current.Path, issues))
             {
+                if (childrenAddedForNode >= MaxChildrenPerNode)
+                {
+                    issues.Add(new HostIssue
+                    {
+                        Scope = "OpennessTraversal",
+                        Message = "Node child limit reached; remaining children were skipped.",
+                        Details = $"Node: {current.Path}; Limit: {MaxChildrenPerNode}"
+                    });
+                    break;
+                }
+
                 var childName = TryReadString(child, "Name") ?? TryReadString(child, "DisplayName") ?? child.GetType().Name;
                 var childPath = $"{current.Path}/{childName}";
                 var childTypeName = child.GetType().Name;
@@ -474,7 +494,19 @@ internal static class Program
                 });
 
                 discoveredCount++;
+                childrenAddedForNode++;
                 queue.Enqueue((child, childPath, current.Depth + 1));
+
+                if (nodeTraversalTimer.Elapsed > TimeSpan.FromSeconds(30))
+                {
+                    issues.Add(new HostIssue
+                    {
+                        Scope = "OpennessTraversal",
+                        Message = "Node traversal watchdog limit reached; remaining child discovery was skipped.",
+                        Details = $"Node: {current.Path}; Elapsed: {nodeTraversalTimer.Elapsed:c}"
+                    });
+                    break;
+                }
             }
         }
 
@@ -489,7 +521,7 @@ internal static class Program
         }
     }
 
-    private static IEnumerable<object> EnumerateChildObjects(object parent)
+    private static IEnumerable<object> EnumerateChildObjects(object parent, string parentPath, ICollection<HostIssue> issues)
     {
         var properties = parent.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -500,14 +532,37 @@ internal static class Program
                 continue;
             }
 
+            if (!IsCandidateChildProperty(property) || ShouldSkipProperty(property))
+            {
+                continue;
+            }
+
             object? value;
 
             try
             {
+                _heartbeatSession?.UpdatePhase("TraverseProperty", $"{parentPath}.{property.Name}");
+                var propertyTimer = Stopwatch.StartNew();
                 value = property.GetValue(parent);
+
+                if (propertyTimer.Elapsed > SlowPropertyThreshold)
+                {
+                    issues.Add(new HostIssue
+                    {
+                        Scope = "OpennessTraversal",
+                        Message = "Slow property access detected during traversal.",
+                        Details = $"Node: {parentPath}; Property: {property.Name}; Elapsed: {propertyTimer.Elapsed:c}"
+                    });
+                }
             }
-            catch
+            catch (Exception exception)
             {
+                issues.Add(new HostIssue
+                {
+                    Scope = "OpennessTraversal",
+                    Message = "Skipping property because value retrieval failed.",
+                    Details = $"Node: {parentPath}; Property: {property.Name}; {DescribeException(exception)}"
+                });
                 continue;
             }
 
@@ -523,8 +578,66 @@ internal static class Program
 
             if (value is IEnumerable enumerable && value is not string)
             {
-                foreach (var item in enumerable)
+                var itemCount = 0;
+
+                IEnumerator? enumerator;
+                try
                 {
+                    enumerator = enumerable.GetEnumerator();
+                }
+                catch (Exception exception)
+                {
+                    issues.Add(new HostIssue
+                    {
+                        Scope = "OpennessTraversal",
+                        Message = "Skipping enumerable property because enumerator creation failed.",
+                        Details = $"Node: {parentPath}; Property: {property.Name}; {DescribeException(exception)}"
+                    });
+                    continue;
+                }
+
+                if (enumerator is null)
+                {
+                    continue;
+                }
+
+                while (true)
+                {
+                    bool hasNext;
+                    try
+                    {
+                        hasNext = enumerator.MoveNext();
+                    }
+                    catch (Exception exception)
+                    {
+                        issues.Add(new HostIssue
+                        {
+                            Scope = "OpennessTraversal",
+                            Message = "Skipping enumerable property because iteration failed.",
+                            Details = $"Node: {parentPath}; Property: {property.Name}; {DescribeException(exception)}"
+                        });
+                        break;
+                    }
+
+                    if (!hasNext)
+                    {
+                        break;
+                    }
+
+                    itemCount++;
+                    if (itemCount > MaxItemsPerEnumerableProperty)
+                    {
+                        issues.Add(new HostIssue
+                        {
+                            Scope = "OpennessTraversal",
+                            Message = "Enumerable item limit reached; remaining items were skipped.",
+                            Details = $"Node: {parentPath}; Property: {property.Name}; Limit: {MaxItemsPerEnumerableProperty}"
+                        });
+                        break;
+                    }
+
+                    var item = enumerator.Current;
+
                     if (item is null || IsSimpleValue(item.GetType()))
                     {
                         continue;
@@ -538,6 +651,35 @@ internal static class Program
 
             yield return value;
         }
+    }
+
+    private static bool IsCandidateChildProperty(PropertyInfo property)
+    {
+        var propertyName = property.Name;
+        var typeName = property.PropertyType.FullName ?? property.PropertyType.Name;
+        var candidate = $"{propertyName} {typeName}";
+
+        if (ContainsAny(candidate,
+                "Device", "Group", "Folder", "Collection", "Items", "Blocks", "BlockGroup", "Tags", "TagTable", "Types", "DataType",
+                "Software", "Plc", "Screen", "Faceplate", "Template", "Recipe", "Alarm", "Connection", "Subnet", "Network", "Interface",
+                "Port", "Module", "Library", "MasterCopies", "Users", "Audit", "Technology", "Motion", "Pid", "Safety", "Diagnostics"))
+        {
+            return true;
+        }
+
+        return typeof(IEnumerable).IsAssignableFrom(property.PropertyType) && typeName.Contains("Siemens.Engineering", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldSkipProperty(PropertyInfo property)
+    {
+        var candidate = $"{property.Name} {property.PropertyType.FullName}";
+
+        if (ContainsAny(candidate, "Image", "Bitmap", "Thumbnail", "Preview", "Binary", "Content", "Stream", "Byte[]", "Icon"))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static bool IsSimpleValue(Type type)
