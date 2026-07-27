@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.41**
+Version baseline for this milestone: **0.0.42**
 
 Scope:
 
@@ -326,6 +326,8 @@ Scope:
   - selected-domain export filter no longer requires preview object count > 0
   - export start condition requires any selected domain (not selected+count)
 - Incremented application version to `0.0.41` in central build metadata and UI fallback version resolution.
+- Improved preview scan block detection by extending preview traversal with bounded PLC model child enumeration (`BlockGroup`, nested groups, tags/types/technology sources) so Blocks/Tags/UDTs are visible in selection even in lightweight mode.
+- Incremented application version to `0.0.42` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

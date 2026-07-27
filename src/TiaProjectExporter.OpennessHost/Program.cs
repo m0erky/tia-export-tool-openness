@@ -20,6 +20,7 @@ internal static class Program
     private const int MaxItemsPerEnumerableProperty = 1000;
     private const int MaxScalarMetadataEntries = 128;
     private const int MaxScalarMetadataValueLength = 1024;
+    private const int MaxPreviewCandidates = 600;
     private const int MaxExportXmlFileBytes = 2 * 1024 * 1024;
     private const int MaxExportXmlChars = 500_000;
     private const int MaxSourceTextChars = 250_000;
@@ -496,24 +497,80 @@ internal static class Program
                     break;
                 }
 
-                var objectType = ClassifyPlcObjectType(entry.Node, entry.Path);
-                var name = TryReadString(entry.Node, "Name") ?? TryReadString(entry.Node, "DisplayName") ?? entry.Node.GetType().Name;
+                AddPreviewNode(objects, entry.Node, entry.Path, 2);
 
-                objects.Add(new HostObjectNode
+                var previewQueue = new Queue<(object Node, string Path, int Depth)>();
+                previewQueue.Enqueue((entry.Node, entry.Path, 2));
+
+                var previewVisited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var previewCount = 0;
+
+                while (previewQueue.Count > 0 && previewCount < MaxPreviewCandidates)
                 {
-                    ObjectType = objectType,
-                    Name = name,
-                    QualifiedPath = entry.Path,
-                    Depth = 2,
-                    Metadata = new Dictionary<string, string>
+                    var current = previewQueue.Dequeue();
+
+                    if (current.Depth >= 5)
                     {
-                        ["RuntimeType"] = entry.Node.GetType().FullName ?? entry.Node.GetType().Name,
-                        ["ExtractionStrategy"] = "HostPreview",
-                        ["QualifiedPath"] = entry.Path
+                        continue;
                     }
-                });
+
+                    foreach (var candidate in EnumeratePlcModelChildren(current.Node, current.Path, issues))
+                    {
+                        var key = $"{candidate.ObjectType}|{candidate.Path}";
+
+                        if (!previewVisited.Add(key))
+                        {
+                            continue;
+                        }
+
+                        var candidatePath = string.IsNullOrWhiteSpace(candidate.Path)
+                            ? current.Path
+                            : candidate.Path!;
+
+                        AddPreviewNode(objects, candidate.Node, candidatePath, current.Depth + 1, candidate.ObjectType, candidate.Strategy);
+                        previewCount++;
+
+                        if (candidate.ObjectType is "BlockGroup" or "TagTableGroup" or "TypeGroup")
+                        {
+                            previewQueue.Enqueue((candidate.Node, candidatePath, current.Depth + 1));
+                        }
+
+                        if (previewCount >= MaxPreviewCandidates)
+                        {
+                            break;
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private static void AddPreviewNode(
+        ICollection<HostObjectNode> objects,
+        object node,
+        string path,
+        int depth,
+        string? objectTypeOverride = null,
+        string? strategyOverride = null)
+    {
+        var objectType = string.IsNullOrWhiteSpace(objectTypeOverride)
+            ? ClassifyPlcObjectType(node, path)
+            : objectTypeOverride!;
+        var name = TryReadString(node, "Name") ?? TryReadString(node, "DisplayName") ?? node.GetType().Name;
+
+        objects.Add(new HostObjectNode
+        {
+            ObjectType = objectType,
+            Name = name,
+            QualifiedPath = path,
+            Depth = depth,
+            Metadata = new Dictionary<string, string>
+            {
+                ["RuntimeType"] = node.GetType().FullName ?? node.GetType().Name,
+                ["ExtractionStrategy"] = strategyOverride ?? "HostPreview",
+                ["QualifiedPath"] = path
+            }
+        });
     }
 
     private static void TraverseSoftwareGraph(object root, string rootPath, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
