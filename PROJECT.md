@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.42**
+Version baseline for this milestone: **0.0.43**
 
 Scope:
 
@@ -47,6 +47,84 @@ Scope:
 - Add the first inventory/export use case for project metadata, device tree, and software object enumeration.
 - Expand generated reports from placeholder repository files to real discovered content.
 - Prepare the pipeline for per-object exporters and resilient export reporting.
+
+## Current State Snapshot (2026-07-27)
+
+### Version / Commit
+- Version: `0.0.42`
+- Last commit: `3d955a7`
+- Branch: `main`
+
+### Goal Right Now
+- Stable, production-grade export of TIA projects with:
+  - reliable scan/preselection workflow
+  - full export of PLC/HMI/project content
+  - robust handling for large projects (no crashes/OOM)
+
+### What works
+- Out-of-process Openness host (`net48`) is integrated and used by UI.
+- Health check + heartbeat pipeline is implemented and visible in UI.
+- Export pipeline runs resiliently stage-by-stage.
+- Bundle-based inventory output exists (`Export/<Domain>/Bundles/...`).
+- Pre-scan + domain selection workflow exists in UI (`Scan Project Contents`).
+- Full export path still uses full traversal (not preview objects).
+
+### Current critical issue
+- In some real projects, preview scan can still under-detect PLC blocks (FB/FC/DB), even though they exist.
+- This is a preview detection quality issue, not necessarily full-export availability.
+- User expectation: scan must clearly show that blocks exist before export.
+
+### Recent technical changes (latest)
+- Added traversal detail levels: `Preview` vs `Full`.
+- Pre-scan switched to `BuildInventoryPreviewAsync`.
+- Host supports `--preview`.
+- Preview traversal expanded to inspect PLC model children (`BlockGroup`, nested groups, tags/types/etc.).
+- Selection safety fallback:
+  - all domains selected by default after scan
+  - export no longer blocked by preview count `> 0`.
+
+### Critical files
+- `src/TiaProjectExporter.OpennessHost/Program.cs`
+- `src/TiaProjectExporter.Tia/Inventory/OutOfProcessTiaProjectOpennessAdapter.cs`
+- `src/TiaProjectExporter.Tia/Inventory/OpennessBackedTiaProjectInventoryProvider.cs`
+- `src/TiaProjectExporter.Core/Models/TiaTraversalDetailLevel.cs`
+- `src/TiaProjectExporter.UI/ViewModels/MainWindowViewModel.cs`
+- `src/TiaProjectExporter.Core/Models/TiaInventoryDomainClassifier.cs`
+- `src/TiaProjectExporter.Export/Stages/ProjectInventoryStage.cs`
+- `src/TiaProjectExporter.Export/Stages/InventoryObjectExportStage.cs`
+
+### Open bugs / risks
+- Preview may still miss blocks in specific Siemens runtime object graphs.
+- Need stronger preview instrumentation/logging for why block branches are skipped.
+- Full export quality still depends on typed extraction depth + robust fallback handling.
+
+### Decisions (do not change without reason)
+- Keep out-of-process host model (stability and assembly isolation).
+- Keep two-phase workflow (pre-scan then export).
+- Keep full export independent from preview object counts.
+- Keep bundle-first output structure for large projects.
+
+### Next 3 steps (priority)
+1. Add preview diagnostics counters:
+   - discovered PLC entry points
+   - discovered `BlockGroup` count
+   - discovered block object count by type (`OB/FB/FC/DB`).
+2. Add targeted fallback in preview:
+   - if `BlockGroup` unresolved, run bounded reflection fallback specifically for `Blocks` collections.
+3. Add test coverage for preview block discovery path (mock/stub host response and classifier expectations).
+
+### Validation checklist
+- [ ] `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj --no-restore -v minimal`
+- [ ] UI: `Scan Project Contents` shows non-zero Blocks for known project with FB/FC/DB.
+- [ ] UI: Export runs after scan with default selections.
+- [ ] Export output contains block bundles and source/xml content where available.
+- [ ] No host crash/OOM during scan or export.
+
+### Handy runtime logs
+- Host stderr logs:
+  - `%LocalAppData%\\TiaProjectExporter\\HostLogs\\host-stderr-*.log`
+- Crash logs:
+  - `%LocalAppData%\\TiaProjectExporter\\CrashLogs\\crash-*.log`
 
 ## TODO List
 
