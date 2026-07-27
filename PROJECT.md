@@ -36,7 +36,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.2**
+Version baseline for this milestone: **0.0.3**
 
 Scope:
 
@@ -192,6 +192,8 @@ Scope:
 - Added export/command failure diagnostics file output to `Export/Reports/EXPORT_FAILURE.log` with stack trace and runtime context.
 - Added app-level crash file logging under `%LocalAppData%/TiaProjectExporter/CrashLogs` for unhandled UI/startup/task exceptions.
 - Incremented application version to `0.0.2` in central build metadata and version fallback logic.
+- Added explicit UI runtime identifier targeting (`win-x64`) to prevent `NETSDK1047` during self-contained Windows publish.
+- Incremented application version to `0.0.3` in central build metadata.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

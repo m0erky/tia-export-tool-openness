@@ -70,7 +70,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.2`
+- Current application version: `0.0.3`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -91,6 +91,15 @@ dotnet restore
 dotnet build TiaProjectExporter.sln
 dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj
 ```
+
+### Windows self-contained publish (win-x64)
+
+```powershell
+dotnet restore src/TiaProjectExporter.UI/TiaProjectExporter.UI.csproj -r win-x64
+dotnet publish src/TiaProjectExporter.UI/TiaProjectExporter.UI.csproj -c Release -r win-x64 --self-contained true
+```
+
+If you hit `NETSDK1047` for `net8.0-windows/win-x64`, ensure publish restore runs with `-r win-x64` (or remove `--no-restore` and let publish restore with runtime).
 
 Windows validation workflow artifacts:
 
