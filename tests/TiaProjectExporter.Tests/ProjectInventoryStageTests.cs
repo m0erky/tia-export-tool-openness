@@ -47,6 +47,9 @@ public sealed class ProjectInventoryStageTests
 
         public Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken) =>
             Task.FromResult(_inventory);
+
+        public Task<TiaProjectInventory> BuildInventoryPreviewAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken) =>
+            Task.FromResult(_inventory);
     }
 
     private sealed class RecordingArtifactWriter : IExportArtifactWriter

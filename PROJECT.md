@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.39**
+Version baseline for this milestone: **0.0.40**
 
 Scope:
 
@@ -319,6 +319,8 @@ Scope:
 - Pre-scan now uses lightweight preview inventory (`BuildInventoryPreviewAsync`) and no longer reuses preview objects for final export traversal.
 - Out-of-process host now supports `--preview` and executes a reduced top-level traversal for faster scope selection.
 - Incremented application version to `0.0.39` in central build metadata and UI fallback version resolution.
+- Updated test stub implementations of `ITiaProjectInventoryProvider` to implement the new preview method contract (`BuildInventoryPreviewAsync`) and restore test compilation.
+- Incremented application version to `0.0.40` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 
