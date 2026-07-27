@@ -2,6 +2,7 @@ using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
@@ -596,6 +597,11 @@ internal static class Program
 
     private static IEnumerable<(object Node, string Path)> ResolvePlcEntryPoints(object deviceRoot, string devicePath, ICollection<HostIssue> issues)
     {
+        foreach (var serviceEntry in ResolvePlcEntryPointsFromServices(deviceRoot, devicePath, issues))
+        {
+            yield return serviceEntry;
+        }
+
         foreach (var property in deviceRoot.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!property.CanRead || property.GetIndexParameters().Length > 0)
@@ -653,6 +659,153 @@ internal static class Program
             }
 
             yield return (value, $"{devicePath}/{property.Name}");
+        }
+    }
+
+    private static IEnumerable<(object Node, string Path)> ResolvePlcEntryPointsFromServices(object deviceRoot, string devicePath, ICollection<HostIssue> issues)
+    {
+        var serviceTypeCandidates = ResolveSoftwareContainerServiceTypes();
+
+        if (serviceTypeCandidates.Length == 0)
+        {
+            yield break;
+        }
+
+        var visitedNodes = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        var probeQueue = new Queue<(object Node, string Path, int Depth)>();
+        probeQueue.Enqueue((deviceRoot, devicePath, 0));
+
+        var probeCount = 0;
+
+        while (probeQueue.Count > 0 && probeCount < 150)
+        {
+            var current = probeQueue.Dequeue();
+
+            if (!visitedNodes.Add(current.Node))
+            {
+                continue;
+            }
+
+            probeCount++;
+            _heartbeatSession?.UpdatePhase("TraversePlcServiceProbe", current.Path);
+
+            foreach (var serviceType in serviceTypeCandidates)
+            {
+                if (!TryGetService(current.Node, serviceType, out var serviceInstance, out var serviceError))
+                {
+                    if (!string.IsNullOrWhiteSpace(serviceError) && serviceError!.Contains("MissingMethodException", StringComparison.OrdinalIgnoreCase))
+                    {
+                        issues.Add(new HostIssue
+                        {
+                            Scope = "OpennessTraversal",
+                            Message = "Service probing failed while resolving PLC software entry points.",
+                            Details = $"Node: {current.Path}; Service: {serviceType.FullName}; {serviceError}"
+                        });
+                    }
+
+                    continue;
+                }
+
+                if (serviceInstance is null)
+                {
+                    continue;
+                }
+
+                var softwareProperty = serviceInstance.GetType().GetProperty("Software", BindingFlags.Public | BindingFlags.Instance);
+                var software = softwareProperty?.GetValue(serviceInstance);
+
+                if (software is null || IsSimpleValue(software.GetType()))
+                {
+                    continue;
+                }
+
+                yield return (software, $"{current.Path}/Services/{serviceType.Name}/Software");
+            }
+
+            if (current.Depth >= 2)
+            {
+                continue;
+            }
+
+            foreach (var child in EnumerateChildObjects(current.Node, current.Path, issues))
+            {
+                probeQueue.Enqueue((child, $"{current.Path}/{child.GetType().Name}", current.Depth + 1));
+            }
+        }
+    }
+
+    private static Type[] ResolveSoftwareContainerServiceTypes()
+    {
+        var candidates = new[]
+        {
+            "Siemens.Engineering.HW.Features.SoftwareContainer",
+            "Siemens.Engineering.HW.Features.SoftwareContainerComposition"
+        };
+
+        var results = new List<Type>();
+
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            foreach (var fullName in candidates)
+            {
+                var type = assembly.GetType(fullName, throwOnError: false, ignoreCase: false);
+                if (type is null)
+                {
+                    continue;
+                }
+
+                if (!results.Contains(type))
+                {
+                    results.Add(type);
+                }
+            }
+        }
+
+        return results.ToArray();
+    }
+
+    private static bool TryGetService(object node, Type serviceType, out object? serviceInstance, out string? error)
+    {
+        serviceInstance = null;
+        error = null;
+
+        var nodeType = node.GetType();
+
+        try
+        {
+            var genericMethod = nodeType
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(method =>
+                    method.Name == "GetService"
+                    && method.IsGenericMethodDefinition
+                    && method.GetGenericArguments().Length == 1
+                    && method.GetParameters().Length == 0);
+
+            if (genericMethod is not null)
+            {
+                var closed = genericMethod.MakeGenericMethod(serviceType);
+                serviceInstance = closed.Invoke(node, Array.Empty<object>());
+
+                if (serviceInstance is not null)
+                {
+                    return true;
+                }
+            }
+
+            var typedMethod = nodeType.GetMethod("GetService", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(Type) }, null);
+
+            if (typedMethod is not null)
+            {
+                serviceInstance = typedMethod.Invoke(node, new object[] { serviceType });
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception exception)
+        {
+            error = DescribeException(exception);
+            return false;
         }
     }
 
@@ -1375,6 +1528,15 @@ internal sealed class HostOptions
 
         return null;
     }
+}
+
+internal sealed class ReferenceEqualityComparer : IEqualityComparer<object>
+{
+    public static readonly ReferenceEqualityComparer Instance = new();
+
+    public new bool Equals(object? x, object? y) => ReferenceEquals(x, y);
+
+    public int GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
 }
 
 [DataContract]

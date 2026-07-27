@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.23**
+Version baseline for this milestone: **0.0.24**
 
 Scope:
 
@@ -259,6 +259,9 @@ Scope:
 - Added bounded scalar metadata extraction (`Prop.*`) per discovered runtime node in host traversal to capture more settings/configuration fields in exported object artifacts.
 - Added metadata safeguards (entry/value limits and slow-property diagnostics) to balance depth with stability on large projects.
 - Incremented application version to `0.0.23` in central build metadata and UI fallback version resolution.
+- Added Siemens service-based PLC entry-point probing (`GetService(...)` with software-container candidates) in host traversal so PLC software trees can be discovered even when not surfaced as direct object properties.
+- Added bounded service-probe breadth/depth with heartbeat phase reporting (`TraversePlcServiceProbe`) to keep diagnostics clear during PLC discovery.
+- Incremented application version to `0.0.24` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 

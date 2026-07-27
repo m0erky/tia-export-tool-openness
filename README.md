@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.23`
+- Current application version: `0.0.24`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -84,6 +84,7 @@ If build complains about SDK mismatch, install that SDK first.
 - Publish/build orchestration now builds the net48 Openness host without inheriting UI runtime RID settings, preventing `NETSDK1047` (`net48/win-x64`) during UI publish.
 - PLC discovery hardening: out-of-process host now performs a dedicated PLC-focused traversal pass over software/block/tag/datatype candidate properties to improve discovery of `OB`/`FB`/`FC`/`DB`/`InstanceDB`/`Tag`/`UDT` objects.
 - Metadata depth hardening: host now extracts bounded scalar runtime properties per discovered object (`Prop.*`) to capture more configuration/settings data while guarding performance with limits.
+- PLC entry-point hardening: host now probes Siemens `GetService(...)` software-container services while traversing device nodes to discover PLC software trees that are not directly exposed via plain public properties.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
