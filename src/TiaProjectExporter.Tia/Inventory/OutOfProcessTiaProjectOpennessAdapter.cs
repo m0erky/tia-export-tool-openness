@@ -222,12 +222,15 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 
         var standardOutput = await standardOutputTask.ConfigureAwait(false);
-        var standardError = await standardErrorTask.ConfigureAwait(false);
+        var standardErrorResult = await standardErrorTask.ConfigureAwait(false);
+        var standardError = standardErrorResult.Aggregated;
+
+        logger.LogInformation("Openness host stderr transcript: {LogPath}", standardErrorResult.LogPath);
 
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"Openness host exited with code {process.ExitCode}. STDERR: {standardError}");
+                $"Openness host exited with code {process.ExitCode}. STDERR: {standardError}. HostLog: {standardErrorResult.LogPath}");
         }
 
         if (string.IsNullOrWhiteSpace(standardOutput))
@@ -245,9 +248,18 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         return response;
     }
 
-    private static async Task<string> ConsumeStandardErrorAsync(StreamReader errorReader, ILogger logger, CancellationToken cancellationToken)
+    private static async Task<HostStandardErrorResult> ConsumeStandardErrorAsync(StreamReader errorReader, ILogger logger, CancellationToken cancellationToken)
     {
         var builder = new StringBuilder();
+        var logDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "TiaProjectExporter",
+            "HostLogs");
+        Directory.CreateDirectory(logDirectory);
+        var logPath = Path.Combine(logDirectory, $"host-stderr-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.log");
+
+        await using var stream = new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.Read);
+        await using var writer = new StreamWriter(stream);
 
         while (true)
         {
@@ -259,6 +271,9 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
             {
                 break;
             }
+
+            await writer.WriteLineAsync(line).ConfigureAwait(false);
+            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             if (TryParseHeartbeat(line, out var heartbeat))
             {
@@ -274,7 +289,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
             builder.Append(line);
         }
 
-        return builder.ToString();
+        return new HostStandardErrorResult(builder.ToString(), logPath);
     }
 
     private static bool TryParseHeartbeat(string line, out HeartbeatMessage heartbeat)
@@ -309,6 +324,8 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         string.IsNullOrWhiteSpace(value)
             ? "\"\""
             : $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
+
+    private readonly record struct HostStandardErrorResult(string Aggregated, string LogPath);
 
     private readonly record struct HeartbeatMessage(string TimestampUtc, string State, string Phase, string Detail);
 

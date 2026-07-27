@@ -72,7 +72,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.9`
+- Current application version: `0.0.10`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -236,6 +236,7 @@ Current keys:
   - The UI now writes `Export/Reports/EXPORT_FAILURE.log` on command/export failures, including exception stack and UI log snapshot.
   - Application-level crashes are additionally written under `%LocalAppData%/TiaProjectExporter/CrashLogs`.
   - If the selected output path is not writable, fallback diagnostics are written to `%LocalAppData%/TiaProjectExporter/FailureDiagnostics`.
+  - Host stderr (including raw heartbeat lines) is always written to `%LocalAppData%/TiaProjectExporter/HostLogs/host-stderr-*.log`.
 
 - **`Siemens.Engineering.Contract` / `MissingMethodException` crashes**
   - The exporter now executes Openness in a separate host process (`TiaProjectExporter.OpennessHost.exe`, .NET Framework 4.8) to avoid .NET 8 in-process loader incompatibilities.
