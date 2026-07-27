@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -10,7 +9,7 @@ using TiaProjectExporter.Infrastructure.Serialization;
 namespace TiaProjectExporter.Export.Stages;
 
 /// <summary>
-/// Exports each discovered inventory object into domain folders as JSON/XML/Markdown artifacts.
+/// Exports discovered inventory objects as compact domain/type bundles with deep content.
 /// </summary>
 public sealed class InventoryObjectExportStage : IExportStage
 {
@@ -28,19 +27,36 @@ public sealed class InventoryObjectExportStage : IExportStage
             return;
         }
 
-        var jsonOptions = JsonOptionsFactory.CreateDefault();
-        var exportedCount = 0;
+        var grouped = inventory.Objects
+            .GroupBy(node => new BundleKey(ResolveDomain(node), NormalizeObjectType(node.ObjectType)))
+            .OrderBy(group => group.Key.Domain, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(group => group.Key.ObjectType, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
-        for (var index = 0; index < inventory.Objects.Count; index++)
+        var jsonOptions = JsonOptionsFactory.CreateDefault();
+        var exportedBundles = 0;
+
+        foreach (var group in grouped)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var node = inventory.Objects[index];
-            var relativeBasePath = BuildRelativeBasePath(node, index);
+            var entries = group
+                .OrderBy(node => node.QualifiedPath, StringComparer.OrdinalIgnoreCase)
+                .Select(BuildBundleEntry)
+                .ToArray();
+
+            var relativeBasePath = $"Export/{group.Key.Domain}/Bundles/{SanitizePathSegment(group.Key.ObjectType)}";
 
             if (context.Options.Formats.Contains(ExportFormat.Json))
             {
-                var payload = JsonSerializer.Serialize(BuildSerializableNode(node), jsonOptions);
+                var payload = JsonSerializer.Serialize(new
+                {
+                    domain = group.Key.Domain,
+                    objectType = group.Key.ObjectType,
+                    totalObjects = entries.Length,
+                    objects = entries
+                }, jsonOptions);
+
                 await context.WriteArtifactAsync(
                     new ExportArtifact($"{relativeBasePath}.json", ExportFormat.Json, payload),
                     cancellationToken).ConfigureAwait(false);
@@ -48,7 +64,7 @@ public sealed class InventoryObjectExportStage : IExportStage
 
             if (context.Options.Formats.Contains(ExportFormat.Xml))
             {
-                var xml = BuildNodeXml(node);
+                var xml = BuildBundleXml(group.Key, entries);
                 await context.WriteArtifactAsync(
                     new ExportArtifact($"{relativeBasePath}.xml", ExportFormat.Xml, xml),
                     cancellationToken).ConfigureAwait(false);
@@ -56,43 +72,145 @@ public sealed class InventoryObjectExportStage : IExportStage
 
             if (context.Options.GenerateMarkdownSummaries && context.Options.Formats.Contains(ExportFormat.Markdown))
             {
-                var markdown = BuildNodeMarkdown(node);
+                var markdown = BuildBundleMarkdown(group.Key, entries);
                 await context.WriteArtifactAsync(
                     new ExportArtifact($"{relativeBasePath}.md", ExportFormat.Markdown, markdown),
                     cancellationToken).ConfigureAwait(false);
             }
 
-            await WriteDeepContentArtifactsAsync(context, node, relativeBasePath, cancellationToken).ConfigureAwait(false);
-
-            exportedCount++;
+            exportedBundles++;
         }
 
-        context.AddResult(new ExportedObjectResult("InventoryObjects", "Inventory Object Files", ExportObjectStatus.Succeeded, $"Exported {exportedCount} objects"));
+        context.AddResult(new ExportedObjectResult(
+            "InventoryObjects",
+            "Inventory Object Bundles",
+            ExportObjectStatus.Succeeded,
+            $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles"));
 
         await context.ReportProgressAsync(
-            new ExportProgressUpdate(Name, $"Exported {exportedCount} inventory objects", exportedCount, exportedCount, TimeSpan.Zero)).ConfigureAwait(false);
+            new ExportProgressUpdate(Name, $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles", inventory.Objects.Count, inventory.Objects.Count, TimeSpan.Zero)).ConfigureAwait(false);
     }
 
-    private static string BuildRelativeBasePath(TiaProjectObjectNode node, int index)
+    private static BundleEntry BuildBundleEntry(TiaProjectObjectNode node)
     {
-        var domain = ResolveDomain(node);
-        var segments = node.QualifiedPath
-            .Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Where(segment => !string.Equals(segment, "Project", StringComparison.OrdinalIgnoreCase))
-            .Select(SanitizePathSegment)
-            .Where(segment => !string.IsNullOrWhiteSpace(segment))
-            .Take(6)
-            .ToArray();
+        var metadata = node.Metadata ?? new Dictionary<string, string>();
 
-        if (segments.Length == 0)
+        metadata.TryGetValue("Content.ExportXml", out var exportXml);
+        metadata.TryGetValue("Content.SourceText", out var sourceText);
+
+        return new BundleEntry(
+            Name: node.Name,
+            QualifiedPath: node.QualifiedPath,
+            Depth: node.Depth,
+            Metadata: BuildCompactMetadata(metadata),
+            ExportXmlContent: string.IsNullOrWhiteSpace(exportXml) ? null : exportXml,
+            SourceTextContent: string.IsNullOrWhiteSpace(sourceText) ? null : sourceText);
+    }
+
+    private static string BuildBundleXml(BundleKey key, IReadOnlyCollection<BundleEntry> entries)
+    {
+        var document = new XDocument(
+            new XElement(
+                "TiaObjectBundle",
+                new XAttribute("domain", key.Domain),
+                new XAttribute("objectType", key.ObjectType),
+                new XAttribute("count", entries.Count),
+                entries.Select(entry =>
+                    new XElement(
+                        "Object",
+                        new XAttribute("name", entry.Name),
+                        new XAttribute("path", entry.QualifiedPath),
+                        new XAttribute("depth", entry.Depth),
+                        new XElement("Metadata", entry.Metadata.Select(pair => new XElement("Entry", new XAttribute("key", pair.Key), pair.Value))),
+                        string.IsNullOrWhiteSpace(entry.ExportXmlContent)
+                            ? null
+                            : new XElement("ExportXml", new XCData(entry.ExportXmlContent)),
+                        string.IsNullOrWhiteSpace(entry.SourceTextContent)
+                            ? null
+                            : new XElement("SourceText", new XCData(entry.SourceTextContent))))));
+
+        return document.ToString();
+    }
+
+    private static string BuildBundleMarkdown(BundleKey key, IReadOnlyCollection<BundleEntry> entries)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"# {key.Domain} / {key.ObjectType} Bundle");
+        builder.AppendLine();
+        builder.AppendLine($"Objects: **{entries.Count}**");
+        builder.AppendLine();
+
+        builder.AppendLine("## Objects");
+        builder.AppendLine();
+
+        foreach (var entry in entries)
         {
-            segments = [SanitizePathSegment(node.Name)];
+            builder.AppendLine($"- `{entry.QualifiedPath}`");
         }
 
-        var folder = string.Join('/', segments);
-        var hash = BuildShortHash(node.QualifiedPath);
+        var withSource = entries.Where(item => !string.IsNullOrWhiteSpace(item.SourceTextContent)).ToArray();
+        if (withSource.Length > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine("## Source Content");
+            builder.AppendLine();
 
-        return $"Export/{domain}/Objects/{folder}_{index:00000}_{hash}";
+            foreach (var entry in withSource)
+            {
+                builder.AppendLine($"### {entry.Name}");
+                builder.AppendLine();
+                builder.AppendLine($"Path: `{entry.QualifiedPath}`");
+                builder.AppendLine();
+                builder.AppendLine("```text");
+                builder.AppendLine(entry.SourceTextContent);
+                builder.AppendLine("```");
+                builder.AppendLine();
+            }
+        }
+
+        var withExportXml = entries.Where(item => !string.IsNullOrWhiteSpace(item.ExportXmlContent)).ToArray();
+        if (withExportXml.Length > 0)
+        {
+            builder.AppendLine("## Export XML Content");
+            builder.AppendLine();
+
+            foreach (var entry in withExportXml)
+            {
+                builder.AppendLine($"### {entry.Name}");
+                builder.AppendLine();
+                builder.AppendLine($"Path: `{entry.QualifiedPath}`");
+                builder.AppendLine();
+                builder.AppendLine("```xml");
+                builder.AppendLine(entry.ExportXmlContent);
+                builder.AppendLine("```");
+                builder.AppendLine();
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static Dictionary<string, string> BuildCompactMetadata(IReadOnlyDictionary<string, string>? metadata)
+    {
+        var source = metadata ?? new Dictionary<string, string>();
+        var compact = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var pair in source)
+        {
+            if (pair.Key.StartsWith("Prop.", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (pair.Key.StartsWith("Content.", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            compact[pair.Key] = pair.Value;
+        }
+
+        return compact;
     }
 
     private static string ResolveDomain(TiaProjectObjectNode node)
@@ -122,26 +240,6 @@ public sealed class InventoryObjectExportStage : IExportStage
         if (ContainsAny(candidate, "Device", "Module", "Rack", "Hardware", "Cpu"))
         {
             return "Hardware";
-        }
-
-        if (ContainsAny(candidate, "Hmi", "Screen", "Faceplate", "Recipe", "Alarm"))
-        {
-            return "HMI";
-        }
-
-        if (ContainsAny(candidate, "Tag", "TagTable", "PlcTag"))
-        {
-            return "Tags";
-        }
-
-        if (ContainsAny(candidate, "Udt", "DataType"))
-        {
-            return "UDTs";
-        }
-
-        if (ContainsAny(candidate, "FunctionBlock", "OrganizationBlock", "DataBlock", "InstanceDb", "Block", " FB", " FC", " OB", " DB"))
-        {
-            return "Blocks";
         }
 
         if (ContainsAny(candidate, "Network", "Profinet", "Profibus", "Connection", "Subnet", "Port", "Interface"))
@@ -190,140 +288,18 @@ public sealed class InventoryObjectExportStage : IExportStage
         || objectType.Equals("Recipe", StringComparison.OrdinalIgnoreCase)
         || objectType.Equals("Alarm", StringComparison.OrdinalIgnoreCase);
 
-    private static object BuildSerializableNode(TiaProjectObjectNode node)
+    private static string NormalizeObjectType(string objectType)
     {
-        var compactMetadata = BuildCompactMetadata(node.Metadata);
-
-        return new
+        if (string.IsNullOrWhiteSpace(objectType))
         {
-            node.ObjectType,
-            node.Name,
-            node.QualifiedPath,
-            node.Depth,
-            Metadata = compactMetadata
-        };
-    }
-
-    private static string BuildNodeXml(TiaProjectObjectNode node)
-    {
-        var compactMetadata = BuildCompactMetadata(node.Metadata);
-
-        var document = new XDocument(
-            new XElement(
-                "TiaProjectObject",
-                new XAttribute("type", node.ObjectType),
-                new XAttribute("depth", node.Depth),
-                new XElement("Name", node.Name),
-                new XElement("QualifiedPath", node.QualifiedPath),
-                new XElement(
-                    "Metadata",
-                    compactMetadata.Select(pair =>
-                        new XElement("Entry", new XAttribute("key", pair.Key), pair.Value)))));
-
-        return document.ToString();
-    }
-
-    private static string BuildNodeMarkdown(TiaProjectObjectNode node)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine($"# {node.Name}");
-        builder.AppendLine();
-        builder.AppendLine($"- Type: **{node.ObjectType}**");
-        builder.AppendLine($"- Path: `{node.QualifiedPath}`");
-        builder.AppendLine($"- Depth: **{node.Depth}**");
-        builder.AppendLine();
-
-        var metadata = BuildCompactMetadata(node.Metadata);
-
-        if (metadata.Count == 0)
-        {
-            builder.AppendLine("No metadata available.");
-            return builder.ToString();
+            return "Unmapped";
         }
 
-        builder.AppendLine("## Metadata");
-        builder.AppendLine();
-
-        foreach (var pair in metadata.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            builder.AppendLine($"- {pair.Key}: `{pair.Value}`");
-        }
-
-        return builder.ToString();
+        return objectType.Trim();
     }
 
-    private static Dictionary<string, string> BuildCompactMetadata(IReadOnlyDictionary<string, string>? metadata)
-    {
-        var source = metadata ?? new Dictionary<string, string>();
-        var compact = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var pair in source)
-        {
-            if (pair.Key.StartsWith("Prop.", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (pair.Key.StartsWith("Content.", StringComparison.OrdinalIgnoreCase)
-                && pair.Key is not "Content.ExportXmlLength" and not "Content.SourceTextLength")
-            {
-                continue;
-            }
-
-            compact[pair.Key] = pair.Value;
-        }
-
-        return compact;
-    }
-
-    private static async Task WriteDeepContentArtifactsAsync(
-        ExportExecutionContext context,
-        TiaProjectObjectNode node,
-        string relativeBasePath,
-        CancellationToken cancellationToken)
-    {
-        var metadata = node.Metadata ?? new Dictionary<string, string>();
-
-        if (metadata.TryGetValue("Content.ExportXml", out var exportXml)
-            && !string.IsNullOrWhiteSpace(exportXml)
-            && context.Options.Formats.Contains(ExportFormat.Xml))
-        {
-            await context.WriteArtifactAsync(
-                new ExportArtifact($"{relativeBasePath}.content.export.xml", ExportFormat.Xml, exportXml),
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        if (metadata.TryGetValue("Content.SourceText", out var sourceText)
-            && !string.IsNullOrWhiteSpace(sourceText))
-        {
-            var format = context.Options.Formats.Contains(ExportFormat.Markdown)
-                ? ExportFormat.Markdown
-                : ExportFormat.Json;
-
-            var wrappedSource = format == ExportFormat.Markdown
-                ? BuildSourceMarkdown(node, sourceText)
-                : sourceText;
-
-            var extension = format == ExportFormat.Markdown ? "md" : "txt";
-            await context.WriteArtifactAsync(
-                new ExportArtifact($"{relativeBasePath}.content.source.{extension}", format, wrappedSource),
-                cancellationToken).ConfigureAwait(false);
-        }
-    }
-
-    private static string BuildSourceMarkdown(TiaProjectObjectNode node, string sourceText)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine($"# Source - {node.Name}");
-        builder.AppendLine();
-        builder.AppendLine($"Type: **{node.ObjectType}**");
-        builder.AppendLine($"Path: `{node.QualifiedPath}`");
-        builder.AppendLine();
-        builder.AppendLine("```text");
-        builder.AppendLine(sourceText);
-        builder.AppendLine("```");
-        return builder.ToString();
-    }
+    private static bool ContainsAny(string candidate, params string[] terms) =>
+        terms.Any(term => candidate.Contains(term, StringComparison.OrdinalIgnoreCase));
 
     private static string SanitizePathSegment(string value)
     {
@@ -353,17 +329,18 @@ public sealed class InventoryObjectExportStage : IExportStage
             return "item";
         }
 
-        return normalized.Length > 64
-            ? normalized[..64]
+        return normalized.Length > 80
+            ? normalized.Substring(0, 80)
             : normalized;
     }
 
-    private static bool ContainsAny(string candidate, params string[] terms) =>
-        terms.Any(term => candidate.Contains(term, StringComparison.OrdinalIgnoreCase));
+    private readonly record struct BundleKey(string Domain, string ObjectType);
 
-    private static string BuildShortHash(string input)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes[..4]).ToLowerInvariant();
-    }
+    private sealed record BundleEntry(
+        string Name,
+        string QualifiedPath,
+        int Depth,
+        IReadOnlyDictionary<string, string> Metadata,
+        string? ExportXmlContent,
+        string? SourceTextContent);
 }

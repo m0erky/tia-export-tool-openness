@@ -8,7 +8,7 @@ namespace TiaProjectExporter.Tests;
 public sealed class InventoryObjectExportStageTests
 {
     [Fact]
-    public async Task ExecuteAsync_WritesPerObjectArtifactsIntoDomainFolders()
+    public async Task ExecuteAsync_WritesDomainTypeBundlesWithDeepContent()
     {
         var writer = new RecordingArtifactWriter();
         var context = new ExportExecutionContext(
@@ -45,13 +45,18 @@ public sealed class InventoryObjectExportStageTests
 
         await stage.ExecuteAsync(context, CancellationToken.None);
 
-        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.StartsWith("Export/Hardware/Objects/", StringComparison.Ordinal) && artifact.RelativePath.EndsWith(".json", StringComparison.Ordinal));
-        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.StartsWith("Export/Blocks/Objects/", StringComparison.Ordinal) && artifact.RelativePath.EndsWith(".md", StringComparison.Ordinal));
-        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.Contains(".content.export.xml", StringComparison.Ordinal));
-        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.Contains(".content.source.", StringComparison.Ordinal));
+        var blocksJson = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/Bundles/FB.json");
+        Assert.Contains("FUNCTION_BLOCK FB100", blocksJson.Content, StringComparison.Ordinal);
+
+        var blocksMarkdown = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/Bundles/FB.md");
+        Assert.Contains("```text", blocksMarkdown.Content, StringComparison.Ordinal);
+        Assert.Contains("```xml", blocksMarkdown.Content, StringComparison.Ordinal);
+
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Hardware/Bundles/Device.json");
 
         var result = Assert.Single(context.Results, item => item.ObjectType == "InventoryObjects");
         Assert.Equal(ExportObjectStatus.Succeeded, result.Status);
+        Assert.Contains("bundles", result.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class RecordingArtifactWriter : IExportArtifactWriter
