@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.35**
+Version baseline for this milestone: **0.0.36**
 
 Scope:
 
@@ -303,6 +303,10 @@ Scope:
   - content truncation caps for `Content.ExportXml` and `Content.SourceText` metadata fields
   - large XML parsing guard for source-text extraction from export XML
 - Incremented application version to `0.0.35` in central build metadata and UI fallback version resolution.
+- Improved UI log usability with explicit scrolling support:
+  - added "Jump to latest" action in log panel
+  - log panel now auto-scrolls while at bottom and preserves manual inspection when user scrolls up
+- Incremented application version to `0.0.36` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

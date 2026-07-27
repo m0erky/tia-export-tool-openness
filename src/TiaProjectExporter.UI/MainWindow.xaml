@@ -285,13 +285,24 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Text="Log Output" />
+                        <DockPanel>
+                            <TextBlock FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Text="Log Output" />
+                            <Button DockPanel.Dock="Right"
+                                    MinWidth="110"
+                                    Margin="12,0,0,0"
+                                    Padding="10,4"
+                                    Click="OnJumpToLatestLogClicked"
+                                    Content="Jump to latest" />
+                        </DockPanel>
                         <ListBox Grid.Row="1"
+                                 x:Name="LogOutputListBox"
                                  Margin="0,14,0,0"
                                  ItemsSource="{Binding LogEntries}"
-                                 FontFamily="Consolas" />
+                                 FontFamily="Consolas"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto" />
                     </Grid>
                 </Border>
             </Grid>
