@@ -39,8 +39,8 @@
 
   <Target Name="CopyOpennessHostArtifacts" AfterTargets="Build;Publish">
     <ItemGroup>
-      <_OpennessHostArtifacts Include="..\TiaProjectExporter.OpennessHost\bin\$(Configuration)\net48\TiaProjectExporter.OpennessHost.exe" />
-      <_OpennessHostArtifacts Include="..\TiaProjectExporter.OpennessHost\bin\$(Configuration)\net48\TiaProjectExporter.OpennessHost.exe.config" />
+      <_OpennessHostArtifacts Include="..\TiaProjectExporter.OpennessHost\bin\$(Configuration)\net48\*"
+                             Exclude="..\TiaProjectExporter.OpennessHost\bin\$(Configuration)\net48\*.pdb;..\TiaProjectExporter.OpennessHost\bin\$(Configuration)\net48\*.xml" />
     </ItemGroup>
 
     <Copy SourceFiles="@(_OpennessHostArtifacts)"

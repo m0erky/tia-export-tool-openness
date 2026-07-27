@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.16**
+Version baseline for this milestone: **0.0.17**
 
 Scope:
 
@@ -238,6 +238,9 @@ Scope:
 - Fixed out-of-process host response deserialization for `metadata` by supporting both object-shaped JSON and DataContract dictionary-entry array shape (`Key`/`Value`).
 - Prevented inventory aborts caused by `System.Text.Json.JsonException` at `$.objects[*].metadata` when host emits DataContract-style dictionary payloads.
 - Incremented application version to `0.0.16` in central build metadata and UI fallback version resolution.
+- Fixed host deployment packaging by copying the complete `TiaProjectExporter.OpennessHost` net48 output set (not only `.exe`/`.config`) into UI build/publish outputs.
+- Resolved runtime `FileNotFoundException` for Siemens collaboration dependencies (for example `Siemens.Collaboration.Net.CoreExtensions`) when launching out-of-process host from deployed UI folder.
+- Incremented application version to `0.0.17` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
@@ -256,6 +259,7 @@ Scope:
 - Siemens feed variability can produce transitive lower-bound resolution warnings (`NU1603`) for Openness packages; host project now keeps this warning visible while treating it as non-fatal (`WarningsNotAsErrors`) so real dependency problems are still diagnosable.
 - Reflection traversal remains heuristic and can still be slow on very large runtime nodes; newly added safeguards reduce hangs but should be complemented with progressively more typed Siemens extractor implementations.
 - Host/UI JSON contract still uses mixed serializer technologies (DataContractJsonSerializer in host, System.Text.Json in adapter); medium-term cleanup should unify on a single serializer for stricter compatibility guarantees.
+- Host deployment still assumes side-by-side assembly loading from the UI output directory; a future installer/MSIX workflow should explicitly validate file completeness post-install.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.
