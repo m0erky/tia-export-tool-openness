@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.37**
+Version baseline for this milestone: **0.0.38**
 
 Scope:
 
@@ -313,6 +313,8 @@ Scope:
   - export now requires completed pre-scan and at least one selected domain
 - Added domain classification utility in core and domain filter propagation through export options/stages.
 - Incremented application version to `0.0.37` in central build metadata and UI fallback version resolution.
+- Fixed domain-classification regression where non-root objects (for example devices under `Project/...`) were incorrectly mapped to `Project`; project-domain mapping now targets root/project nodes only.
+- Incremented application version to `0.0.38` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

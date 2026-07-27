@@ -32,7 +32,7 @@ public static class TiaInventoryDomainClassifier
 
         var candidate = $"{node.ObjectType} {node.QualifiedPath} {node.Name}";
 
-        if (ContainsAny(candidate, "Project", "Root"))
+        if (IsProjectRootNode(node))
         {
             return ExportDomain.Project;
         }
@@ -122,5 +122,20 @@ public static class TiaInventoryDomainClassifier
     {
         return terms.Any(term => candidate.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
-}
 
+    private static bool IsProjectRootNode(TiaProjectObjectNode node)
+    {
+        if (node.Depth == 0)
+        {
+            return true;
+        }
+
+        if (!string.Equals(node.QualifiedPath, "Project", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return node.ObjectType.Contains("Project", StringComparison.OrdinalIgnoreCase)
+            || node.ObjectType.Contains("Root", StringComparison.OrdinalIgnoreCase);
+    }
+}
