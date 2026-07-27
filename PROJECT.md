@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.10**
+Version baseline for this milestone: **0.0.11**
 
 Scope:
 
@@ -225,6 +225,9 @@ Scope:
 - Incremented application version to `0.0.9` in central build metadata and UI fallback version resolution.
 - Added persistent out-of-process host stderr transcript logging under `%LocalAppData%/TiaProjectExporter/HostLogs` for post-mortem diagnostics even when UI logs are sparse.
 - Incremented application version to `0.0.10` in central build metadata and UI fallback version resolution.
+- Integrated Siemens `Siemens.Collaboration.Net.TiaPortal.Openness.Extensions` (`20.*`) into the net48 out-of-process host to use Siemens-standard resolver initialization before first Openness access.
+- Added robust resolver bootstrap in `TiaProjectExporter.OpennessHost` (`Api.Global().Openness().Initialize()` via reflection), with explicit diagnostic messages and fallback to manual assembly loading.
+- Incremented application version to `0.0.11` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
@@ -239,6 +242,7 @@ Scope:
 - Source project browse currently uses file picker workflow; directory-style `.apXX` project selection still relies on manual path input.
 - Linux-based automated test environment still cannot validate WPF runtime crash-path handling; verify new diagnostics files on Windows runtime failures.
 - Out-of-process host is currently .NET Framework 4.8 only and requires appropriate runtime/tooling on Windows build and execution hosts.
+- Siemens NuGet package restore for the host now depends on access to `nuget.org` (or an internal mirrored feed) during restore/build.
 - Runtime reflection signatures may vary across TIA versions; project open/device enumeration behavior requires validation on real V18/V19/V20 Windows installations.
 - Block call relationships currently depend on inventory metadata (`Calls`) and still need deep Siemens block-reference extraction from real PLC software objects.
 - Dependency relationships currently derive from exported metadata keys and still need deeper Siemens API relationship extraction for complete graph accuracy.
@@ -302,6 +306,7 @@ Windows-specific notes:
 
 - The UI project targets WPF and should be built on Windows with the .NET 8 SDK and Windows Desktop workload available.
 - TIA Openness integration requires Siemens TIA Portal installations and compatible Openness assemblies for V18/V19/V20.
+- Restore/build now also requires access to Siemens NuGet packages (for `Siemens.Collaboration.Net.TiaPortal.Openness.Extensions` `20.*`) in `TiaProjectExporter.OpennessHost`; use `nuget.org` or a mirrored internal feed.
 - Linux verification command used successfully in this workspace:
 
 ```bash

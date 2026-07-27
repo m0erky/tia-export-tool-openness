@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Openness.Extensions" />
     <Reference Include="System.Runtime.Serialization" />
   </ItemGroup>
 </Project>

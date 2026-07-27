@@ -82,6 +82,8 @@ internal static class Program
             return new HostHealthResponse { Healthy = false, Details = details };
         }
 
+        TryInitializeSiemensResolver(details);
+
         var assemblyPath = ResolveEngineeringAssemblyPath(options.InstallPath);
 
         if (string.IsNullOrWhiteSpace(assemblyPath))
@@ -167,6 +169,8 @@ internal static class Program
                 Issues = issues
             };
         }
+
+        TryInitializeSiemensResolver();
 
         var assemblyPath = ResolveEngineeringAssemblyPath(options.InstallPath);
         _heartbeatSession.UpdatePhase("ResolveAssemblies", "Resolving Siemens.Engineering assembly");
@@ -649,6 +653,90 @@ internal static class Program
         };
 
         return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static void TryInitializeSiemensResolver(ICollection<string>? details = null)
+    {
+        try
+        {
+            var apiType = ResolveOpennessApiType();
+
+            if (apiType is null)
+            {
+                details?.Add("Siemens Openness resolver API type was not found; continuing with manual assembly loading.");
+                return;
+            }
+
+            var globalMethod = apiType.GetMethod("Global", BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
+            var globalInstance = globalMethod?.Invoke(null, Array.Empty<object>());
+
+            if (globalInstance is null)
+            {
+                details?.Add("Siemens Openness resolver Global() returned null; continuing with manual assembly loading.");
+                return;
+            }
+
+            var opennessMethod = globalInstance.GetType().GetMethod("Openness", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+            var opennessInstance = opennessMethod?.Invoke(globalInstance, Array.Empty<object>());
+
+            if (opennessInstance is null)
+            {
+                details?.Add("Siemens Openness resolver Openness() returned null; continuing with manual assembly loading.");
+                return;
+            }
+
+            var initializeMethod = opennessInstance.GetType().GetMethod("Initialize", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+
+            if (initializeMethod is null)
+            {
+                details?.Add("Siemens Openness resolver Initialize() method was not found; continuing with manual assembly loading.");
+                return;
+            }
+
+            initializeMethod.Invoke(opennessInstance, Array.Empty<object>());
+            details?.Add("Siemens Openness resolver initialized successfully.");
+        }
+        catch (Exception exception)
+        {
+            details?.Add($"Siemens Openness resolver initialization failed; using manual assembly loading. {DescribeException(exception)}");
+        }
+    }
+
+    private static Type? ResolveOpennessApiType()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var type = assembly.GetType("Siemens.Collaboration.Net.TiaPortal.Openness.Api", throwOnError: false, ignoreCase: false);
+            if (type is not null)
+            {
+                return type;
+            }
+        }
+
+        var candidateAssemblyNames = new[]
+        {
+            "Siemens.Collaboration.Net.TiaPortal.Openness.Extensions",
+            "Siemens.Collaboration.Net.TiaPortal.Openness.Resolver"
+        };
+
+        foreach (var assemblyName in candidateAssemblyNames)
+        {
+            try
+            {
+                var loadedAssembly = Assembly.Load(assemblyName);
+                var type = loadedAssembly.GetType("Siemens.Collaboration.Net.TiaPortal.Openness.Api", throwOnError: false, ignoreCase: false);
+                if (type is not null)
+                {
+                    return type;
+                }
+            }
+            catch
+            {
+                // Ignore and continue with manual fallback.
+            }
+        }
+
+        return null;
     }
 
     private static string DescribeException(Exception exception)

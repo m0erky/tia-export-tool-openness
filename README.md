@@ -22,6 +22,7 @@ TIA projects are rich but difficult to diff, inspect, and analyze outside TIA Po
 
 - Detects installed TIA versions (targeting V18/V19/V20) via Windows registry.
 - Uses Siemens Openness via out-of-process host execution (`TiaProjectExporter.OpennessHost`, .NET Framework 4.8) to avoid .NET 8 in-process loader conflicts.
+- Uses Siemens `Siemens.Collaboration.Net.TiaPortal.Openness.Extensions` (`20.*`) in the host and initializes the Siemens resolver API before first Openness access, with manual path loading as fallback.
 - Exports traversal inventory and metadata into structured artifacts.
 - Generates analysis artifacts, including:
   - call graph
@@ -61,6 +62,7 @@ The exporter uses a pipeline of independent stages (`IExportStage`) so failures 
   - .NET Framework 4.8 Developer Pack (required to build `TiaProjectExporter.OpennessHost`)
 - TIA Portal installation(s), ideally V18/V19/V20 with Openness available
 - Access rights to open target TIA project files
+- Access to `nuget.org` (or mirrored internal feed) for Siemens package restore in `TiaProjectExporter.OpennessHost`
 
 ## SDK pinning
 
@@ -72,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.10`
+- Current application version: `0.0.11`
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
