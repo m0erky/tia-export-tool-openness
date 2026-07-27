@@ -660,9 +660,9 @@ internal static class Program
 
 internal sealed class HostOptions
 {
-    public string ProjectPath { get; init; } = string.Empty;
+    public string ProjectPath { get; set; } = string.Empty;
 
-    public string InstallPath { get; init; } = string.Empty;
+    public string InstallPath { get; set; } = string.Empty;
 
     public static HostOptions Parse(string[] args, bool requireProjectPath = true)
     {

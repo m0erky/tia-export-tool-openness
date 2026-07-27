@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.5**
+Version baseline for this milestone: **0.0.6**
 
 Scope:
 
@@ -208,6 +208,8 @@ Scope:
 - Added UI `Health Check` command plus traffic-light indicator (green/yellow/red) and status text.
 - Added Linux-safe unit test coverage for out-of-process health-check service non-Windows behavior.
 - Incremented application version to `0.0.5` in central build metadata and UI fallback version resolution.
+- Fixed .NET Framework 4.8 host build compatibility by replacing `init` accessors with `set` accessors in host options (`IsExternalInit` no longer required).
+- Incremented application version to `0.0.6` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
