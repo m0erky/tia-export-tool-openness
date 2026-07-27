@@ -97,6 +97,11 @@ public sealed class InventoryObjectExportStage : IExportStage
     {
         var candidate = $"{node.ObjectType} {node.QualifiedPath} {node.Name}";
 
+        if (ContainsAny(candidate, "Device", "Module", "Rack", "Hardware", "Cpu"))
+        {
+            return "Hardware";
+        }
+
         if (ContainsAny(candidate, "Hmi", "Screen", "Faceplate", "Recipe", "Alarm"))
         {
             return "HMI";
@@ -112,7 +117,7 @@ public sealed class InventoryObjectExportStage : IExportStage
             return "UDTs";
         }
 
-        if (ContainsAny(candidate, "Fb", "Fc", "Ob", "Db", "Block", "InstanceDb", "Plc"))
+        if (ContainsAny(candidate, "FunctionBlock", "OrganizationBlock", "DataBlock", "InstanceDb", "Block", " FB", " FC", " OB", " DB"))
         {
             return "Blocks";
         }
@@ -120,11 +125,6 @@ public sealed class InventoryObjectExportStage : IExportStage
         if (ContainsAny(candidate, "Network", "Profinet", "Profibus", "Connection", "Subnet", "Port", "Interface"))
         {
             return "Network";
-        }
-
-        if (ContainsAny(candidate, "Device", "Module", "Rack", "Hardware", "Cpu"))
-        {
-            return "Hardware";
         }
 
         if (ContainsAny(candidate, "Library"))

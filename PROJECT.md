@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.19**
+Version baseline for this milestone: **0.0.20**
 
 Scope:
 
@@ -247,6 +247,9 @@ Scope:
 - Incremented application version to `0.0.18` in central build metadata and UI fallback version resolution.
 - Fixed `InventoryObjectExportStageTests` assertion to use `ExportedObjectResult.ObjectType` (instead of non-existent `Scope`) for compatibility with current domain model.
 - Incremented application version to `0.0.19` in central build metadata and UI fallback version resolution.
+- Refined inventory object domain routing precedence to classify hardware (`Device/Module/Rack/Cpu`) before block heuristics and avoid false `Blocks` mapping for names like `PLC_1`.
+- Narrowed block-domain keyword matching to reduce substring collisions.
+- Incremented application version to `0.0.20` in central build metadata and UI fallback version resolution.
 - Added centralized semantic version metadata in `Directory.Build.props` and set initial released version to `0.0.1`.
 - Exposed application version in WPF UI (`WindowTitle` and header version text) based on assembly informational version.
 
