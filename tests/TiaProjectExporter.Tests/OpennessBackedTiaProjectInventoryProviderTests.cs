@@ -10,10 +10,12 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     public async Task BuildInventoryPreviewAsync_ForwardsPreviewDetailLevel_ToAdapter()
     {
         TiaTraversalDetailLevel? capturedDetailLevel = null;
+        IReadOnlyCollection<ExportDomain>? capturedDomains = null;
 
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, detailLevel) =>
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, detailLevel, includedDomains) =>
         {
             capturedDetailLevel = detailLevel;
+            capturedDomains = includedDomains;
 
             return Task.FromResult(
                 new TiaProjectTraversalResult(
@@ -29,16 +31,19 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
         _ = await provider.BuildInventoryPreviewAsync("C:/Projects/Sample.ap20", null, CancellationToken.None);
 
         Assert.Equal(TiaTraversalDetailLevel.Preview, capturedDetailLevel);
+        Assert.Null(capturedDomains);
     }
 
     [Fact]
     public async Task BuildInventoryAsync_ForwardsFullDetailLevel_ToAdapter()
     {
         TiaTraversalDetailLevel? capturedDetailLevel = null;
+        IReadOnlyCollection<ExportDomain>? capturedDomains = null;
 
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, detailLevel) =>
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, detailLevel, includedDomains) =>
         {
             capturedDetailLevel = detailLevel;
+            capturedDomains = includedDomains;
 
             return Task.FromResult(
                 new TiaProjectTraversalResult(
@@ -51,15 +56,19 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
                     Issues: Array.Empty<ExportIssue>()));
         }));
 
-        _ = await provider.BuildInventoryAsync("C:/Projects/Sample.ap20", null, CancellationToken.None);
+        var selectedDomains = new[] { ExportDomain.Blocks, ExportDomain.Tags };
+
+        _ = await provider.BuildInventoryAsync("C:/Projects/Sample.ap20", null, CancellationToken.None, selectedDomains);
 
         Assert.Equal(TiaTraversalDetailLevel.Full, capturedDetailLevel);
+        Assert.NotNull(capturedDomains);
+        Assert.Equal(selectedDomains, capturedDomains);
     }
 
     [Fact]
     public async Task BuildInventoryAsync_ReturnsUnavailable_WhenProjectPathMissing()
     {
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _, _) => throw new InvalidOperationException()));
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _, _, _) => throw new InvalidOperationException()));
 
         var inventory = await provider.BuildInventoryAsync(null, null, CancellationToken.None);
 
@@ -71,7 +80,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     [Fact]
     public async Task BuildInventoryAsync_ReturnsPartial_WhenTraversalReturnsIssues()
     {
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, _) =>
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, _, _) =>
             Task.FromResult(
                 new TiaProjectTraversalResult(
                     ProjectName: "Sample",
@@ -96,7 +105,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     [Fact]
     public async Task BuildInventoryAsync_ReturnsUnavailable_WhenOnlyRootObjectExistsAndIssuesPresent()
     {
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, _) =>
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, _, _, _) =>
             Task.FromResult(
                 new TiaProjectTraversalResult(
                     ProjectName: "Sample",
@@ -120,7 +129,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     [Fact]
     public async Task BuildInventoryAsync_ReturnsUnavailable_WhenTraversalThrows()
     {
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _, _) => throw new InvalidOperationException("Boom")));
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((_, _, _, _) => throw new InvalidOperationException("Boom")));
 
         var inventory = await provider.BuildInventoryAsync("C:/Projects/Sample.ap18", null, CancellationToken.None);
 
@@ -134,7 +143,7 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
     {
         string? capturedOverride = null;
 
-        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, overridePath, _) =>
+        var provider = new OpennessBackedTiaProjectInventoryProvider(new StubOpennessAdapter((projectPath, overridePath, _, _) =>
         {
             capturedOverride = overridePath;
 
@@ -153,14 +162,19 @@ public sealed class OpennessBackedTiaProjectInventoryProviderTests
 
     private sealed class StubOpennessAdapter : ITiaProjectOpennessAdapter
     {
-        private readonly Func<string, string?, TiaTraversalDetailLevel, Task<TiaProjectTraversalResult>> _traverseAsync;
+        private readonly Func<string, string?, TiaTraversalDetailLevel, IReadOnlyCollection<ExportDomain>?, Task<TiaProjectTraversalResult>> _traverseAsync;
 
-        public StubOpennessAdapter(Func<string, string?, TiaTraversalDetailLevel, Task<TiaProjectTraversalResult>> traverseAsync)
+        public StubOpennessAdapter(Func<string, string?, TiaTraversalDetailLevel, IReadOnlyCollection<ExportDomain>?, Task<TiaProjectTraversalResult>> traverseAsync)
         {
             _traverseAsync = traverseAsync;
         }
 
-        public Task<TiaProjectTraversalResult> TraverseAsync(string projectPath, string? tiaInstallationPathOverride, TiaTraversalDetailLevel detailLevel, CancellationToken cancellationToken) =>
-            _traverseAsync(projectPath, tiaInstallationPathOverride, detailLevel);
+        public Task<TiaProjectTraversalResult> TraverseAsync(
+            string projectPath,
+            string? tiaInstallationPathOverride,
+            TiaTraversalDetailLevel detailLevel,
+            CancellationToken cancellationToken,
+            IReadOnlyCollection<ExportDomain>? includedDomains = null) =>
+            _traverseAsync(projectPath, tiaInstallationPathOverride, detailLevel, includedDomains);
     }
 }

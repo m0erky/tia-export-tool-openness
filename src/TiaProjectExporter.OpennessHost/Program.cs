@@ -282,13 +282,14 @@ internal static class Program
             }
 
             _heartbeatSession.UpdatePhase("Traverse", "Walking project graph");
+            var domainScope = TraversalDomainScope.FromRaw(options.IncludedDomains);
             if (options.IsPreview)
             {
-                TraverseProjectPreview(project, objects, issues);
+                TraverseProjectPreview(project, objects, issues, domainScope);
             }
             else
             {
-                TraverseProject(project, objects, issues);
+                TraverseProject(project, objects, issues, domainScope);
             }
         }
         catch (Exception exception)
@@ -379,7 +380,11 @@ internal static class Program
         }
     }
 
-    private static void TraverseProject(object project, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
+    private static void TraverseProject(
+        object project,
+        ICollection<HostObjectNode> objects,
+        ICollection<HostIssue> issues,
+        TraversalDomainScope domainScope)
     {
         _heartbeatSession?.UpdatePhase("TraverseProject", "Inspecting project root and devices");
         var projectName = TryReadString(project, "Name");
@@ -433,8 +438,16 @@ internal static class Program
             });
 
             deviceCount++;
-            TraverseSoftwareGraph(device, devicePath, objects, issues);
-            TraversePlcFocusedGraph(device, devicePath, objects, issues);
+
+            if (domainScope.IncludeGenericSoftwareGraph)
+            {
+                TraverseSoftwareGraph(device, devicePath, objects, issues);
+            }
+
+            if (domainScope.IncludePlcFocusedGraph)
+            {
+                TraversePlcFocusedGraph(device, devicePath, objects, issues, domainScope);
+            }
         }
 
         if (deviceCount == 0)
@@ -448,8 +461,17 @@ internal static class Program
         }
     }
 
-    private static void TraverseProjectPreview(object project, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
+    private static void TraverseProjectPreview(
+        object project,
+        ICollection<HostObjectNode> objects,
+        ICollection<HostIssue> issues,
+        TraversalDomainScope domainScope)
     {
+        if (!domainScope.AllowPreviewScan)
+        {
+            return;
+        }
+
         _heartbeatSession?.UpdatePhase("TraversePreview", "Inspecting project root and top-level software areas");
         var diagnostics = new PreviewScanDiagnostics();
 
@@ -533,12 +555,19 @@ internal static class Program
                             ? current.Path
                             : candidate.Path!;
 
-                        TrackPreviewDiagnostics(candidate.ObjectType ?? string.Empty, candidatePath, diagnostics, ref entryBlockCount, ref entryBlockGroupCount);
+                        var candidateObjectType = candidate.ObjectType ?? ClassifyPlcObjectType(candidate.Node, candidatePath);
 
-                        AddPreviewNode(objects, candidate.Node, candidatePath, current.Depth + 1, candidate.ObjectType, candidate.Strategy);
+                        if (!domainScope.IsCandidateAllowed(candidateObjectType, candidatePath))
+                        {
+                            continue;
+                        }
+
+                        TrackPreviewDiagnostics(candidateObjectType, candidatePath, diagnostics, ref entryBlockCount, ref entryBlockGroupCount);
+
+                        AddPreviewNode(objects, candidate.Node, candidatePath, current.Depth + 1, candidateObjectType, candidate.Strategy);
                         previewCount++;
 
-                        if (candidate.ObjectType is "BlockGroup" or "TagTableGroup" or "TypeGroup")
+                        if (candidateObjectType is "BlockGroup" or "TagTableGroup" or "TypeGroup")
                         {
                             previewQueue.Enqueue((candidate.Node, candidatePath, current.Depth + 1));
                         }
@@ -550,10 +579,10 @@ internal static class Program
                     }
                 }
 
-                if (entryBlockCount == 0)
+                if (domainScope.IncludePlcFocusedGraph && entryBlockCount == 0)
                 {
                     diagnostics.BlockFallbackActivations++;
-                    var fallbackResult = DiscoverPreviewBlocksFallback(entry.Node, entry.Path, previewVisited, objects, issues, diagnostics);
+                    var fallbackResult = DiscoverPreviewBlocksFallback(entry.Node, entry.Path, previewVisited, objects, issues, diagnostics, domainScope);
                     entryBlockCount += fallbackResult.BlockCount;
                     entryBlockGroupCount += fallbackResult.BlockGroupCount;
                 }
@@ -574,7 +603,8 @@ internal static class Program
         ISet<string> previewVisited,
         ICollection<HostObjectNode> objects,
         ICollection<HostIssue> issues,
-        PreviewScanDiagnostics diagnostics)
+        PreviewScanDiagnostics diagnostics,
+        TraversalDomainScope domainScope)
     {
         _heartbeatSession?.UpdatePhase("TraversePreviewFallback", entryPath);
 
@@ -615,6 +645,11 @@ internal static class Program
                 var objectType = ClassifyPlcObjectType(child, childPath);
                 var previewKey = $"{objectType}|{childPath}";
                 var relevant = IsPreviewBlockRelevant(objectType, childPath);
+
+                if (!domainScope.IsCandidateAllowed(objectType, childPath))
+                {
+                    relevant = false;
+                }
 
                 if (relevant && previewVisited.Add(previewKey))
                 {
@@ -840,7 +875,12 @@ internal static class Program
         }
     }
 
-    private static void TraversePlcFocusedGraph(object deviceRoot, string devicePath, ICollection<HostObjectNode> objects, ICollection<HostIssue> issues)
+    private static void TraversePlcFocusedGraph(
+        object deviceRoot,
+        string devicePath,
+        ICollection<HostObjectNode> objects,
+        ICollection<HostIssue> issues,
+        TraversalDomainScope domainScope)
     {
         var entryPoints = ResolvePlcEntryPoints(deviceRoot, devicePath, issues).ToArray();
 
@@ -893,6 +933,12 @@ internal static class Program
                 var objectType = string.IsNullOrWhiteSpace(candidate.ObjectType)
                     ? ClassifyPlcObjectType(child, childPath)
                     : candidate.ObjectType!;
+
+                if (!domainScope.IsCandidateAllowed(objectType, childPath))
+                {
+                    continue;
+                }
+
                 var dedupKey = $"{objectType}|{childPath}";
 
                 if (!visited.Add(dedupKey))
@@ -2438,10 +2484,13 @@ internal sealed class HostOptions
 
     public bool IsPreview { get; set; }
 
+    public IReadOnlyCollection<string> IncludedDomains { get; set; } = Array.Empty<string>();
+
     public static HostOptions Parse(string[] args, bool requireProjectPath = true)
     {
         var projectPath = GetValue(args, "--project");
         var installPath = GetValue(args, "--install");
+        var rawDomains = GetValue(args, "--domains");
 
         if (requireProjectPath && string.IsNullOrWhiteSpace(projectPath))
         {
@@ -2457,8 +2506,26 @@ internal sealed class HostOptions
         {
             ProjectPath = projectPath ?? string.Empty,
             InstallPath = installPath!,
-            IsPreview = args.Any(argument => string.Equals(argument, "--preview", StringComparison.OrdinalIgnoreCase))
+            IsPreview = args.Any(argument => string.Equals(argument, "--preview", StringComparison.OrdinalIgnoreCase)),
+            IncludedDomains = ParseDomains(rawDomains)
         };
+    }
+
+    private static IReadOnlyCollection<string> ParseDomains(string? serializedDomains)
+    {
+        if (string.IsNullOrWhiteSpace(serializedDomains))
+        {
+            return Array.Empty<string>();
+        }
+
+        var domains = serializedDomains!;
+
+        return domains
+            .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(domain => domain.Trim())
+            .Where(domain => !string.IsNullOrWhiteSpace(domain))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static string? GetValue(IReadOnlyList<string> args, string key)
@@ -2526,6 +2593,169 @@ internal sealed class PreviewScanDiagnostics
     public int BlockFallbackNodesVisited { get; set; }
 
     public int EntryLimitHits { get; set; }
+}
+
+internal sealed class TraversalDomainScope
+{
+    private readonly HashSet<string> _includedDomains;
+
+    private TraversalDomainScope(HashSet<string> includedDomains)
+    {
+        _includedDomains = includedDomains;
+    }
+
+    public bool HasRestrictions => _includedDomains.Count > 0;
+
+    public bool IncludePlcFocusedGraph => !HasRestrictions || _includedDomains.Overlaps(PlcFocusedDomains);
+
+    public bool IncludeGenericSoftwareGraph => !HasRestrictions || _includedDomains.Overlaps(GenericSoftwareDomains);
+
+    public bool AllowPreviewScan => !HasRestrictions || IncludePlcFocusedGraph || IncludeGenericSoftwareGraph;
+
+    public static TraversalDomainScope FromRaw(IReadOnlyCollection<string>? rawDomains)
+    {
+        var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (rawDomains is null)
+        {
+            return new TraversalDomainScope(normalized);
+        }
+
+        foreach (var rawDomain in rawDomains)
+        {
+            if (string.IsNullOrWhiteSpace(rawDomain))
+            {
+                continue;
+            }
+
+            normalized.Add(rawDomain.Trim());
+        }
+
+        return new TraversalDomainScope(normalized);
+    }
+
+    public bool IsCandidateAllowed(string objectType, string qualifiedPath)
+    {
+        if (!HasRestrictions)
+        {
+            return true;
+        }
+
+        var domain = ResolveDomain(objectType, qualifiedPath);
+        return _includedDomains.Contains(domain);
+    }
+
+    private static string ResolveDomain(string objectType, string qualifiedPath)
+    {
+        if (IsAny(objectType, "OB", "FB", "FC", "DB", "InstanceDB", "BlockGroup", "Source"))
+        {
+            return "Blocks";
+        }
+
+        if (IsAny(objectType, "Tag", "TagTable", "TagTableGroup"))
+        {
+            return "Tags";
+        }
+
+        if (IsAny(objectType, "UDT", "DataType", "Type", "TypeGroup"))
+        {
+            return "Udts";
+        }
+
+        if (objectType.IndexOf("Hmi", StringComparison.OrdinalIgnoreCase) >= 0 || objectType.IndexOf("Screen", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Hmi";
+        }
+
+        if (objectType.IndexOf("Technology", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Technology";
+        }
+
+        if (objectType.IndexOf("Library", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Libraries";
+        }
+
+        if (objectType.IndexOf("Diagnostic", StringComparison.OrdinalIgnoreCase) >= 0 || objectType.IndexOf("Audit", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Diagnostics";
+        }
+
+        if (IsAny(objectType, "Device", "Module", "Rack", "Cpu"))
+        {
+            return "Hardware";
+        }
+
+        if (objectType.IndexOf("Network", StringComparison.OrdinalIgnoreCase) >= 0 || qualifiedPath.IndexOf("/Network", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Network";
+        }
+
+        if (objectType.IndexOf("Project", StringComparison.OrdinalIgnoreCase) >= 0 || string.Equals(qualifiedPath, "Project", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Project";
+        }
+
+        if (objectType.IndexOf("Plc", StringComparison.OrdinalIgnoreCase) >= 0 || objectType.IndexOf("Software", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Plc";
+        }
+
+        if (qualifiedPath.IndexOf("/Blocks/", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Blocks";
+        }
+
+        if (qualifiedPath.IndexOf("/Tag", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Tags";
+        }
+
+        if (qualifiedPath.IndexOf("/Type", StringComparison.OrdinalIgnoreCase) >= 0 || qualifiedPath.IndexOf("/UDT", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Udts";
+        }
+
+        if (qualifiedPath.IndexOf("/Technology", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return "Technology";
+        }
+
+        return "Metadata";
+    }
+
+    private static bool IsAny(string value, params string[] candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (string.Equals(value, candidate, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static readonly HashSet<string> PlcFocusedDomains = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Plc",
+        "Blocks",
+        "Tags",
+        "Udts",
+        "Technology"
+    };
+
+    private static readonly HashSet<string> GenericSoftwareDomains = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Hardware",
+        "Network",
+        "Hmi",
+        "Libraries",
+        "Diagnostics",
+        "Metadata"
+    };
 }
 
 internal sealed class ReferenceEqualityComparer : IEqualityComparer<object>

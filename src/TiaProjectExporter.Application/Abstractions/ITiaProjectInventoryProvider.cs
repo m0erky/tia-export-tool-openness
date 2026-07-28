@@ -10,10 +10,18 @@ public interface ITiaProjectInventoryProvider
     /// <summary>
     /// Builds a project inventory for the supplied project path.
     /// </summary>
-    Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken);
+    Task<TiaProjectInventory> BuildInventoryAsync(
+        string? projectPath,
+        string? tiaInstallationPathOverride,
+        CancellationToken cancellationToken,
+        IReadOnlyCollection<ExportDomain>? includedDomains = null);
 
     /// <summary>
     /// Builds a lightweight preview inventory used for export-scope selection.
     /// </summary>
-    Task<TiaProjectInventory> BuildInventoryPreviewAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken);
+    Task<TiaProjectInventory> BuildInventoryPreviewAsync(
+        string? projectPath,
+        string? tiaInstallationPathOverride,
+        CancellationToken cancellationToken,
+        IReadOnlyCollection<ExportDomain>? includedDomains = null);
 }

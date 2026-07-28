@@ -31,7 +31,11 @@ public sealed class ProjectInventoryStage : IExportStage
     {
         var inventory = context.Inventory
             ?? await _inventoryProvider
-                .BuildInventoryAsync(context.Options.ProjectPath, context.Options.TiaInstallationPathOverride, cancellationToken)
+                .BuildInventoryAsync(
+                    context.Options.ProjectPath,
+                    context.Options.TiaInstallationPathOverride,
+                    cancellationToken,
+                    context.Options.IncludedDomains)
                 .ConfigureAwait(false);
 
         inventory = ApplyDomainFilter(inventory, context.Options.IncludedDomains);

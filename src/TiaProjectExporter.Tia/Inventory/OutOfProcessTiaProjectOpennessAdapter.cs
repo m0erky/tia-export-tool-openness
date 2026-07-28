@@ -37,7 +37,8 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         string projectPath,
         string? tiaInstallationPathOverride,
         TiaTraversalDetailLevel detailLevel,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyCollection<ExportDomain>? includedDomains = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -95,7 +96,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
 
         try
         {
-            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, detailLevel, _logger, cancellationToken).ConfigureAwait(false);
+            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, detailLevel, includedDomains, _logger, cancellationToken).ConfigureAwait(false);
 
             if (response is null)
             {
@@ -276,10 +277,11 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         string projectPath,
         string installPath,
         TiaTraversalDetailLevel detailLevel,
+        IReadOnlyCollection<ExportDomain>? includedDomains,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var arguments = BuildArguments(projectPath, installPath, detailLevel);
+        var arguments = BuildArguments(projectPath, installPath, detailLevel, includedDomains);
 
         var startInfo = new ProcessStartInfo
         {
@@ -395,11 +397,27 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         return true;
     }
 
-    private static string BuildArguments(string projectPath, string installPath, TiaTraversalDetailLevel detailLevel)
+    private static string BuildArguments(
+        string projectPath,
+        string installPath,
+        TiaTraversalDetailLevel detailLevel,
+        IReadOnlyCollection<ExportDomain>? includedDomains)
     {
         var builder = new StringBuilder();
         builder.Append("--project ").Append(Quote(projectPath)).Append(' ');
         builder.Append("--install ").Append(Quote(installPath));
+
+        if (includedDomains is { Count: > 0 })
+        {
+            var serializedDomains = string.Join(
+                ',',
+                includedDomains
+                    .Distinct()
+                    .OrderBy(domain => domain.ToString(), StringComparer.Ordinal)
+                    .Select(domain => domain.ToString()));
+
+            builder.Append(' ').Append("--domains ").Append(Quote(serializedDomains));
+        }
 
         if (detailLevel == TiaTraversalDetailLevel.Preview)
         {

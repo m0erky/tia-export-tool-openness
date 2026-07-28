@@ -34,7 +34,8 @@ public sealed class ReflectionTiaProjectOpennessAdapter : ITiaProjectOpennessAda
         string projectPath,
         string? tiaInstallationPathOverride,
         TiaTraversalDetailLevel detailLevel,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyCollection<ExportDomain>? includedDomains = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

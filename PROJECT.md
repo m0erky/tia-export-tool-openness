@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.44**
+Version baseline for this milestone: **0.0.45**
 
 Scope:
 
@@ -48,11 +48,11 @@ Scope:
 - Expand generated reports from placeholder repository files to real discovered content.
 - Prepare the pipeline for per-object exporters and resilient export reporting.
 
-## Current State Snapshot (2026-07-27)
+## Current State Snapshot (2026-07-28)
 
 ### Version / Commit
-- Version: `0.0.44`
-- Last commit: `341c0e1`
+- Version: `0.0.45`
+- Last commit: `4a3b98e`
 - Branch: `main`
 
 ### Goal Right Now
@@ -67,13 +67,21 @@ Scope:
 - Export pipeline runs resiliently stage-by-stage.
 - Bundle-based inventory output exists (`Export/<Domain>/Bundles/...`).
 - Pre-scan + domain selection workflow exists in UI (`Scan Project Contents`).
-- Full export path still uses full traversal (not preview objects).
+- Full export now forwards selected domains into host traversal for domain-aware export scope reduction.
 
 ### Current critical issue
-- Preview detection quality is improved, but still needs Windows real-project validation across V18/V19/V20 to confirm reliable FB/FC/DB/OB visibility in all runtime graph variants.
-- Residual risk: edge-case Siemens object graphs may still expose blocks behind service/property variants not covered by current bounded fallback.
+- Domain-aware traversal filtering is now implemented, but still needs Windows real-project validation to quantify runtime/memory reduction and ensure no domain-specific under-export regressions.
+- Residual risk: domain mapping in host traversal scope is heuristic and should be cross-checked against real Siemens runtime type catalogs on V18/V19/V20.
 
 ### Recent technical changes (latest)
+- Added end-to-end domain-aware traversal forwarding for full exports:
+  - UI-selected `IncludedDomains` now flow through inventory provider and openness adapter into host CLI argument `--domains`.
+  - host parses and applies traversal scope restrictions before expensive traversal branches.
+- Added traversal scope gating in host:
+  - PLC-focused traversal runs only when PLC-related domains are selected.
+  - generic software graph traversal is skipped for PLC-only selections (for example Blocks/Tags/UDTs), reducing unnecessary whole-project traversal.
+- Added/updated tests for forwarding semantics:
+  - inventory provider tests now verify selected domains are forwarded with full traversal and preview remains unscoped by default.
 - Preview scan now records root-level diagnostics counters in project metadata:
   - discovered PLC entry points
   - discovered `BlockGroup` count
@@ -106,16 +114,18 @@ Scope:
 - Keep bundle-first output structure for large projects.
 
 ### Next 3 steps (priority)
-1. Validate preview reliability on Windows real projects (V18/V19/V20):
-   - compare TIA block counts vs preview counters (`PreviewDiagnostics.*`) and UI domain counts.
-2. Promote preview diagnostics into user-visible runtime logs:
-   - explicit per-scan summary in UI log output for fast support triage.
-3. Expand test coverage around host-response preview diagnostics parsing + domain-count expectations for block-heavy inventories.
+1. Validate domain-aware traversal on Windows real projects (V18/V19/V20):
+   - compare runtime duration/memory between single-domain and all-domain exports.
+2. Promote preview + traversal-scope diagnostics into user-visible runtime logs:
+   - explicit per-run summary of selected domains, applied scope, and preview counters.
+3. Expand tests for host argument composition and domain-scope application edge cases (`Udts`, `Hmi`, `Diagnostics`, mixed selections).
 
 ### Validation checklist
 - [x] `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj --no-restore -v minimal`
+- [x] `dotnet build src/TiaProjectExporter.OpennessHost/TiaProjectExporter.OpennessHost.csproj -v minimal`
 - [ ] UI: `Scan Project Contents` shows non-zero Blocks for known project with FB/FC/DB.
 - [ ] UI: Export runs after scan with default selections.
+- [ ] UI: Single-domain export (for example only `Blocks`) does not traverse unrelated domains in host runtime logs.
 - [ ] Export output contains block bundles and source/xml content where available.
 - [ ] No host crash/OOM during scan or export.
 
@@ -409,6 +419,10 @@ Scope:
 - Added preview diagnostics counters persisted on root metadata (`PreviewDiagnostics.*`) for PLC entry points, block-group counts, block-type counts (OB/FB/FC/DB), fallback activity, and preview limit hits.
 - Added inventory-provider tests to validate traversal detail-level forwarding (`BuildInventoryPreviewAsync` => `Preview`, `BuildInventoryAsync` => `Full`).
 - Incremented application version to `0.0.44` in central build metadata and UI fallback version resolution.
+- Added domain-aware full traversal filtering by forwarding selected export domains (`IncludedDomains`) through inventory provider and openness adapter into host argument `--domains`.
+- Added host-side domain scope parsing and traversal gating so PLC-only selections skip unrelated generic software traversal paths.
+- Extended inventory-provider tests to assert selected domain forwarding behavior for full traversal calls.
+- Incremented application version to `0.0.45` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

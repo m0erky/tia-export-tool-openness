@@ -8,6 +8,36 @@ namespace TiaProjectExporter.Tests;
 public sealed class ProjectInventoryStageTests
 {
     [Fact]
+    public async Task ExecuteAsync_ForwardsIncludedDomains_ToInventoryProvider()
+    {
+        var writer = new RecordingArtifactWriter();
+        IReadOnlyCollection<ExportDomain>? capturedDomains = null;
+
+        var context = new ExportExecutionContext(
+            ExportOptions.CreateDefault("out") with { IncludedDomains = new[] { ExportDomain.Blocks } },
+            writer,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+
+        var stage = new ProjectInventoryStage(new CapturingInventoryProvider(
+            new TiaProjectInventory(
+                TiaInventoryStatus.Complete,
+                ProjectName: "Sample",
+                ProjectPath: "C:/Sample.ap20",
+                Objects: new[]
+                {
+                    new TiaProjectObjectNode("Project", "Sample", "Project", 0)
+                },
+                Issues: Array.Empty<ExportIssue>()),
+            domains => capturedDomains = domains));
+
+        await stage.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.NotNull(capturedDomains);
+        Assert.Single(capturedDomains!);
+        Assert.Contains(ExportDomain.Blocks, capturedDomains!);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WritesInventoryArtifactsAndIssues()
     {
         var writer = new RecordingArtifactWriter();
@@ -45,10 +75,47 @@ public sealed class ProjectInventoryStageTests
             _inventory = inventory;
         }
 
-        public Task<TiaProjectInventory> BuildInventoryAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken) =>
+        public Task<TiaProjectInventory> BuildInventoryAsync(
+            string? projectPath,
+            string? tiaInstallationPathOverride,
+            CancellationToken cancellationToken,
+            IReadOnlyCollection<ExportDomain>? includedDomains = null) =>
             Task.FromResult(_inventory);
 
-        public Task<TiaProjectInventory> BuildInventoryPreviewAsync(string? projectPath, string? tiaInstallationPathOverride, CancellationToken cancellationToken) =>
+        public Task<TiaProjectInventory> BuildInventoryPreviewAsync(
+            string? projectPath,
+            string? tiaInstallationPathOverride,
+            CancellationToken cancellationToken,
+            IReadOnlyCollection<ExportDomain>? includedDomains = null) =>
+            Task.FromResult(_inventory);
+    }
+
+    private sealed class CapturingInventoryProvider : ITiaProjectInventoryProvider
+    {
+        private readonly TiaProjectInventory _inventory;
+        private readonly Action<IReadOnlyCollection<ExportDomain>?> _capture;
+
+        public CapturingInventoryProvider(TiaProjectInventory inventory, Action<IReadOnlyCollection<ExportDomain>?> capture)
+        {
+            _inventory = inventory;
+            _capture = capture;
+        }
+
+        public Task<TiaProjectInventory> BuildInventoryAsync(
+            string? projectPath,
+            string? tiaInstallationPathOverride,
+            CancellationToken cancellationToken,
+            IReadOnlyCollection<ExportDomain>? includedDomains = null)
+        {
+            _capture(includedDomains);
+            return Task.FromResult(_inventory);
+        }
+
+        public Task<TiaProjectInventory> BuildInventoryPreviewAsync(
+            string? projectPath,
+            string? tiaInstallationPathOverride,
+            CancellationToken cancellationToken,
+            IReadOnlyCollection<ExportDomain>? includedDomains = null) =>
             Task.FromResult(_inventory);
     }
 
