@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.49**
+Version baseline for this milestone: **0.0.50**
 
 Scope:
 
@@ -51,7 +51,7 @@ Scope:
 ## Current State Snapshot (2026-07-29)
 
 ### Version / Commit
-- Version: `0.0.49`
+- Version: `0.0.50`
 - Last commit: `see git log --oneline`
 - Branch: `main`
 
@@ -74,6 +74,9 @@ Scope:
 - Deep export XML failures for inconsistent blocks/UDTs (Siemens-side project consistency state) remain a key source of partial content and need clear operator guidance.
 
 ### Recent technical changes (latest)
+- Safety login hardening: host now resolves multiple SafetyAdministration runtime type candidates plus derived safety-administration runtime types from loaded Siemens assemblies.
+- Safety retry diagnostics: protected-block XML retry path now captures detailed login diagnostics (`SafetyLoginDiagnostics`) and reports whether no service was found vs. login attempts failed.
+- Safety permission detection now also recognizes broader/localized permission-denied patterns (for example `permission denied`, `access denied`, `nicht zulässig`, `Zugriff verweigert`).
 - Added optional Safety offline password flow end-to-end (UI -> export options -> inventory provider -> out-of-process host) to support SafetyAdministration login for protected block export scenarios.
 - Out-of-process adapter now forwards safety password via process environment (`TIA_EXPORTER_SAFETY_OFFLINE_PASSWORD`) to avoid command-line plaintext exposure.
 - Openness host now attempts `LoginToSafetyOfflineProgram(SecureString)` at project level (full export) and retries login around safety permission errors during per-node deep XML export.
@@ -194,11 +197,14 @@ Scope:
 
 ## Completed Tasks
 
+- Hardened host SafetyAdministration service-type resolution with fallback candidates and runtime-derived matching.
+- Improved safety retry diagnostics in deep XML export handling (node-level login diagnostics and clearer failure reporting).
+- Extended safety permission-denied detection with additional localized/wording variants.
+- Incremented application version to `0.0.50` in central build metadata and UI fallback version resolution.
 - Added optional Safety offline password setting in WPF UI and wired secure input handling via `PasswordBox` event forwarding to the ViewModel.
 - Extended export contracts (`ExportOptions`, `ITiaProjectInventoryProvider`, `ITiaProjectOpennessAdapter`) to carry optional safety password through the pipeline.
 - Implemented host-side safety login and retry behavior for safety permission-denied deep export cases.
 - Extended tests to verify safety password forwarding in project inventory stage/provider flow.
-- Incremented application version to `0.0.49` in central build metadata and UI fallback version resolution.
 
 - Documented the target architecture, milestone plan, and build constraints.
 - Created the modular .NET 8 solution structure for `Core`, `Application`, `Infrastructure`, `TIA`, `Export`, `UI`, and `Tests`.

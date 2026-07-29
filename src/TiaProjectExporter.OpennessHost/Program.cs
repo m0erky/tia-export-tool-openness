@@ -29,6 +29,13 @@ internal static class Program
     private const int MaxSourceTextChars = 250_000;
     private const int MaxXmlSourceParseChars = 1_000_000;
     private static readonly TimeSpan SlowPropertyThreshold = TimeSpan.FromSeconds(2);
+    private static readonly string[] SafetyAdministrationTypeCandidates =
+    [
+        "Siemens.Engineering.Safety.SafetyAdministration",
+        "Siemens.Engineering.Safety.Services.SafetyAdministration",
+        "Siemens.Engineering.Safety.ISafetyAdministration",
+        "Siemens.Engineering.Safety.Services.ISafetyAdministration"
+    ];
 
     private static HeartbeatSession? _heartbeatSession;
     private static string? _safetyOfflineProgramPassword;
@@ -1421,7 +1428,7 @@ internal static class Program
             {
                 Scope = "SafetyAdministration",
                 Message = "Safety login requested but SafetyAdministration service type was not resolved.",
-                Details = "Siemens.Engineering.Safety.SafetyAdministration was not found in loaded runtime assemblies."
+                Details = $"Resolved runtime assemblies did not expose known safety service types. Candidates: {string.Join(", ", SafetyAdministrationTypeCandidates)}"
             });
             return;
         }
@@ -1481,7 +1488,7 @@ internal static class Program
             Message = successfulLogins > 0
                 ? "Safety offline program login completed before traversal."
                 : "Safety offline program login did not authenticate any accessible safety context.",
-            Details = $"Successful logins: {successfulLogins}; Failed logins: {failedLogins}; Scanned nodes: {scannedNodes}."
+            Details = $"Successful logins: {successfulLogins}; Failed logins: {failedLogins}; Scanned nodes: {scannedNodes}; Service types: {string.Join(", ", safetyServiceTypes.Select(type => type.FullName))}."
         });
     }
 
@@ -1491,14 +1498,47 @@ internal static class Program
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
-            var candidate = assembly.GetType("Siemens.Engineering.Safety.SafetyAdministration", throwOnError: false, ignoreCase: false);
-            if (candidate is not null && !results.Contains(candidate))
+            foreach (var typeName in SafetyAdministrationTypeCandidates)
             {
-                results.Add(candidate);
+                var candidate = assembly.GetType(typeName, throwOnError: false, ignoreCase: false);
+                if (candidate is not null && !results.Contains(candidate))
+                {
+                    results.Add(candidate);
+                }
+            }
+
+            var derivedCandidates = GetLoadableTypes(assembly)
+                .Where(type =>
+                    !string.IsNullOrWhiteSpace(type.FullName)
+                    && type.FullName.Contains("Siemens.Engineering.Safety", StringComparison.Ordinal)
+                    && type.Name.Contains("SafetyAdministration", StringComparison.OrdinalIgnoreCase));
+
+            foreach (var candidate in derivedCandidates)
+            {
+                if (!results.Contains(candidate))
+                {
+                    results.Add(candidate);
+                }
             }
         }
 
         return results.ToArray();
+    }
+
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException exception)
+        {
+            return exception.Types.Where(type => type is not null).Cast<Type>();
+        }
+        catch
+        {
+            return Array.Empty<Type>();
+        }
     }
 
     private static bool TryInvokeSafetyLogin(object serviceInstance, out string? error)
@@ -1907,10 +1947,11 @@ internal static class Program
         else if (!string.IsNullOrWhiteSpace(exportError))
         {
             var exportErrorText = exportError!;
+            string? safetyLoginDiagnostics = null;
 
             if (IsSafetyPermissionIssue(exportErrorText)
                 && !string.IsNullOrWhiteSpace(_safetyOfflineProgramPassword)
-                && TryLoginToSafetyContext(runtimeNode, qualifiedPath, issues)
+                && TryLoginToSafetyContext(runtimeNode, qualifiedPath, issues, out safetyLoginDiagnostics)
                 && TryExportNodeToXml(runtimeNode, out var retryExportXml, out _))
             {
                 var xmlWasTruncated = false;
@@ -1918,6 +1959,10 @@ internal static class Program
                 metadata["Content.ExportXml"] = xmlForMetadata;
                 metadata["Content.ExportXmlLength"] = retryExportXml.Length.ToString();
                 metadata["SafetyLoginRetrySucceeded"] = bool.TrueString;
+                if (!string.IsNullOrWhiteSpace(safetyLoginDiagnostics))
+                {
+                    metadata["SafetyLoginDiagnostics"] = safetyLoginDiagnostics!;
+                }
 
                 if (xmlWasTruncated)
                 {
@@ -1940,7 +1985,9 @@ internal static class Program
                 {
                     Scope = "SafetyAdministration",
                     Message = "Safety-protected block export is not permitted even after optional login handling.",
-                    Details = $"Node: {qualifiedPath}; ObjectType: {objectType}; Retry info: {exportError}"
+                    Details = string.IsNullOrWhiteSpace(safetyLoginDiagnostics)
+                        ? $"Node: {qualifiedPath}; ObjectType: {objectType}; Retry info: {exportErrorText}"
+                        : $"Node: {qualifiedPath}; ObjectType: {objectType}; Retry info: {exportErrorText}; Login diagnostics: {safetyLoginDiagnostics}"
                 });
             }
         }
@@ -2257,21 +2304,30 @@ internal static class Program
         }
 
         return error.Contains("not permitted", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("permission denied", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("access denied", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("not allowed", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("nicht zul", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("zugriff verweigert", StringComparison.OrdinalIgnoreCase)
             || error.Contains("safety", StringComparison.OrdinalIgnoreCase)
             || error.Contains("f-program", StringComparison.OrdinalIgnoreCase)
             || error.Contains("offline program", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool TryLoginToSafetyContext(object runtimeNode, string qualifiedPath, ICollection<HostIssue> issues)
+    private static bool TryLoginToSafetyContext(object runtimeNode, string qualifiedPath, ICollection<HostIssue> issues, out string? diagnostics)
     {
+        diagnostics = null;
         var safetyServiceTypes = ResolveSafetyAdministrationServiceTypes();
         if (safetyServiceTypes.Length == 0)
         {
+            diagnostics = "No safety service types resolved.";
             return false;
         }
 
         object? current = runtimeNode;
         var depth = 0;
+        var attemptedServices = 0;
+        var discoveredServices = 0;
 
         while (current is not null && depth < 6)
         {
@@ -2283,10 +2339,15 @@ internal static class Program
                     continue;
                 }
 
+                discoveredServices++;
+
                 if (TryInvokeSafetyLogin(service, out var error))
                 {
+                    diagnostics = $"Safety login succeeded at depth {depth} using service {serviceType.FullName}. Discovered services: {discoveredServices}; attempted logins: {attemptedServices + 1}.";
                     return true;
                 }
+
+                attemptedServices++;
 
                 if (!string.IsNullOrWhiteSpace(error))
                 {
@@ -2302,6 +2363,10 @@ internal static class Program
             current = TryGetParentNode(current);
             depth++;
         }
+
+        diagnostics = discoveredServices == 0
+            ? "No safety service found on node context chain."
+            : $"Safety services found ({discoveredServices}) but login failed for all attempted services ({attemptedServices}).";
 
         return false;
     }
