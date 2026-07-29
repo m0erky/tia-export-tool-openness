@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.48`
+- Current application version: `0.0.49`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -165,6 +165,7 @@ Windows validation workflow artifacts:
    - **TIA Installation Path Override (optional)**: manual TIA root path (for example `C:\Program Files\Siemens\Automation\Portal V20`) when auto detection fails
      - use **Browse** to select the folder
      - use **Validate Path** to check for **TIA V20 + Openness** (`Siemens.Engineering.dll`)
+   - **Safety Offline Password (optional)**: used for SafetyAdministration login attempts in Openness host before/retrying protected block export
 4. Click **Scan Project Contents**.
    - review discovered domains and object counts
    - select/deselect domains to export
@@ -181,6 +182,7 @@ Notes:
 - Output directory history and settings are persisted in user profile (`LocalApplicationData`).
 - Export can be canceled from the UI; cancellation is cooperative.
 - Export now requires a valid project path and a successful pre-scan with at least one selected domain.
+- If Safety blocks return "not permitted", configure the optional safety offline password and rerun export.
 
 ## Export output structure
 

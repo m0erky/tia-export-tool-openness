@@ -38,6 +38,35 @@ public sealed class ProjectInventoryStageTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ForwardsSafetyOfflineProgramPassword_ToInventoryProvider()
+    {
+        var writer = new RecordingArtifactWriter();
+        string? capturedPassword = null;
+
+        var context = new ExportExecutionContext(
+            ExportOptions.CreateDefault("out") with { SafetyOfflineProgramPassword = "safety-secret" },
+            writer,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+
+        var stage = new ProjectInventoryStage(new CapturingInventoryProvider(
+            new TiaProjectInventory(
+                TiaInventoryStatus.Complete,
+                ProjectName: "Sample",
+                ProjectPath: "C:/Sample.ap20",
+                Objects: new[]
+                {
+                    new TiaProjectObjectNode("Project", "Sample", "Project", 0)
+                },
+                Issues: Array.Empty<ExportIssue>()),
+            _ => { },
+            safetyPassword => capturedPassword = safetyPassword));
+
+        await stage.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Equal("safety-secret", capturedPassword);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WritesInventoryArtifactsAndIssues()
     {
         var writer = new RecordingArtifactWriter();
@@ -119,14 +148,16 @@ public sealed class ProjectInventoryStageTests
             string? projectPath,
             string? tiaInstallationPathOverride,
             CancellationToken cancellationToken,
-            IReadOnlyCollection<ExportDomain>? includedDomains = null) =>
+            IReadOnlyCollection<ExportDomain>? includedDomains = null,
+            string? safetyOfflineProgramPassword = null) =>
             Task.FromResult(_inventory);
 
         public Task<TiaProjectInventory> BuildInventoryPreviewAsync(
             string? projectPath,
             string? tiaInstallationPathOverride,
             CancellationToken cancellationToken,
-            IReadOnlyCollection<ExportDomain>? includedDomains = null) =>
+            IReadOnlyCollection<ExportDomain>? includedDomains = null,
+            string? safetyOfflineProgramPassword = null) =>
             Task.FromResult(_inventory);
     }
 
@@ -134,20 +165,27 @@ public sealed class ProjectInventoryStageTests
     {
         private readonly TiaProjectInventory _inventory;
         private readonly Action<IReadOnlyCollection<ExportDomain>?> _capture;
+        private readonly Action<string?> _captureSafetyPassword;
 
-        public CapturingInventoryProvider(TiaProjectInventory inventory, Action<IReadOnlyCollection<ExportDomain>?> capture)
+        public CapturingInventoryProvider(
+            TiaProjectInventory inventory,
+            Action<IReadOnlyCollection<ExportDomain>?> capture,
+            Action<string?>? captureSafetyPassword = null)
         {
             _inventory = inventory;
             _capture = capture;
+            _captureSafetyPassword = captureSafetyPassword ?? (_ => { });
         }
 
         public Task<TiaProjectInventory> BuildInventoryAsync(
             string? projectPath,
             string? tiaInstallationPathOverride,
             CancellationToken cancellationToken,
-            IReadOnlyCollection<ExportDomain>? includedDomains = null)
+            IReadOnlyCollection<ExportDomain>? includedDomains = null,
+            string? safetyOfflineProgramPassword = null)
         {
             _capture(includedDomains);
+            _captureSafetyPassword(safetyOfflineProgramPassword);
             return Task.FromResult(_inventory);
         }
 
@@ -155,7 +193,8 @@ public sealed class ProjectInventoryStageTests
             string? projectPath,
             string? tiaInstallationPathOverride,
             CancellationToken cancellationToken,
-            IReadOnlyCollection<ExportDomain>? includedDomains = null) =>
+            IReadOnlyCollection<ExportDomain>? includedDomains = null,
+            string? safetyOfflineProgramPassword = null) =>
             Task.FromResult(_inventory);
     }
 

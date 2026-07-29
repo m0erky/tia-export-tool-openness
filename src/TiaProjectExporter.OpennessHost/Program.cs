@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -30,6 +31,7 @@ internal static class Program
     private static readonly TimeSpan SlowPropertyThreshold = TimeSpan.FromSeconds(2);
 
     private static HeartbeatSession? _heartbeatSession;
+    private static string? _safetyOfflineProgramPassword;
 
     private static int Main(string[] args)
     {
@@ -268,6 +270,7 @@ internal static class Program
 
             _heartbeatSession.UpdatePhase("OpenProject", "Opening TIA project");
             project = OpenProject(tiaPortal, options.ProjectPath);
+            _safetyOfflineProgramPassword = options.SafetyOfflineProgramPassword;
 
             if (project is null)
             {
@@ -283,6 +286,12 @@ internal static class Program
 
             _heartbeatSession.UpdatePhase("Traverse", "Walking project graph");
             var domainScope = TraversalDomainScope.FromRaw(options.IncludedDomains);
+
+            if (!options.IsPreview && !string.IsNullOrWhiteSpace(options.SafetyOfflineProgramPassword))
+            {
+                TryLoginToSafetyOfflineProgram(project, issues);
+            }
+
             if (options.IsPreview)
             {
                 TraverseProjectPreview(project, objects, issues, domainScope);
@@ -306,6 +315,7 @@ internal static class Program
             TryCloseProject(project);
             TryDispose(project);
             TryDispose(tiaPortal);
+            _safetyOfflineProgramPassword = null;
             _heartbeatSession?.Dispose();
             _heartbeatSession = null;
         }
@@ -1396,6 +1406,159 @@ internal static class Program
         }
     }
 
+    private static void TryLoginToSafetyOfflineProgram(object projectRoot, ICollection<HostIssue> issues)
+    {
+        if (string.IsNullOrWhiteSpace(_safetyOfflineProgramPassword))
+        {
+            return;
+        }
+
+        var safetyServiceTypes = ResolveSafetyAdministrationServiceTypes();
+
+        if (safetyServiceTypes.Length == 0)
+        {
+            issues.Add(new HostIssue
+            {
+                Scope = "SafetyAdministration",
+                Message = "Safety login requested but SafetyAdministration service type was not resolved.",
+                Details = "Siemens.Engineering.Safety.SafetyAdministration was not found in loaded runtime assemblies."
+            });
+            return;
+        }
+
+        var queue = new Queue<(object Node, string Path, int Depth)>();
+        var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        queue.Enqueue((projectRoot, "Project", 0));
+
+        var scannedNodes = 0;
+        var successfulLogins = 0;
+        var failedLogins = 0;
+
+        while (queue.Count > 0 && scannedNodes < 2000)
+        {
+            var current = queue.Dequeue();
+
+            if (current.Depth > 7 || !visited.Add(current.Node))
+            {
+                continue;
+            }
+
+            scannedNodes++;
+
+            foreach (var serviceType in safetyServiceTypes)
+            {
+                if (!TryGetService(current.Node, serviceType, out var service, out _)
+                    || service is null)
+                {
+                    continue;
+                }
+
+                if (TryInvokeSafetyLogin(service, out var error))
+                {
+                    successfulLogins++;
+                }
+                else
+                {
+                    failedLogins++;
+                    issues.Add(new HostIssue
+                    {
+                        Scope = "SafetyAdministration",
+                        Message = "Safety login attempt failed.",
+                        Details = $"Node: {current.Path}; Service: {serviceType.FullName}; {error}"
+                    });
+                }
+            }
+
+            foreach (var child in EnumerateChildObjects(current.Node, current.Path, issues))
+            {
+                queue.Enqueue((child, $"{current.Path}/{child.GetType().Name}", current.Depth + 1));
+            }
+        }
+
+        issues.Add(new HostIssue
+        {
+            Scope = "SafetyAdministration",
+            Message = successfulLogins > 0
+                ? "Safety offline program login completed before traversal."
+                : "Safety offline program login did not authenticate any accessible safety context.",
+            Details = $"Successful logins: {successfulLogins}; Failed logins: {failedLogins}; Scanned nodes: {scannedNodes}."
+        });
+    }
+
+    private static Type[] ResolveSafetyAdministrationServiceTypes()
+    {
+        var results = new List<Type>();
+
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var candidate = assembly.GetType("Siemens.Engineering.Safety.SafetyAdministration", throwOnError: false, ignoreCase: false);
+            if (candidate is not null && !results.Contains(candidate))
+            {
+                results.Add(candidate);
+            }
+        }
+
+        return results.ToArray();
+    }
+
+    private static bool TryInvokeSafetyLogin(object serviceInstance, out string? error)
+    {
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(_safetyOfflineProgramPassword))
+        {
+            error = "Safety password is empty.";
+            return false;
+        }
+
+        var method = serviceInstance.GetType().GetMethod(
+            "LoginToSafetyOfflineProgram",
+            BindingFlags.Public | BindingFlags.Instance,
+            null,
+            new[] { typeof(SecureString) },
+            null);
+
+        if (method is null)
+        {
+            error = "Service does not expose LoginToSafetyOfflineProgram(SecureString).";
+            return false;
+        }
+
+        var password = _safetyOfflineProgramPassword!;
+        using var securePassword = CreateSecureString(password);
+
+        try
+        {
+            method.Invoke(serviceInstance, new object[] { securePassword });
+            return true;
+        }
+        catch (Exception exception)
+        {
+            var details = DescribeException(exception);
+            if (details.Contains("already", StringComparison.OrdinalIgnoreCase)
+                && details.Contains("login", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            error = details;
+            return false;
+        }
+    }
+
+    private static SecureString CreateSecureString(string password)
+    {
+        var secure = new SecureString();
+
+        foreach (var character in password)
+        {
+            secure.AppendChar(character);
+        }
+
+        secure.MakeReadOnly();
+        return secure;
+    }
+
     private static IEnumerable<object> EnumeratePlcChildObjects(object parent, string parentPath, ICollection<HostIssue> issues)
     {
         var properties = parent.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
@@ -1743,12 +1906,43 @@ internal static class Program
         }
         else if (!string.IsNullOrWhiteSpace(exportError))
         {
+            var exportErrorText = exportError!;
+
+            if (IsSafetyPermissionIssue(exportErrorText)
+                && !string.IsNullOrWhiteSpace(_safetyOfflineProgramPassword)
+                && TryLoginToSafetyContext(runtimeNode, qualifiedPath, issues)
+                && TryExportNodeToXml(runtimeNode, out var retryExportXml, out _))
+            {
+                var xmlWasTruncated = false;
+                var xmlForMetadata = TruncateContent(retryExportXml, MaxExportXmlChars, out xmlWasTruncated);
+                metadata["Content.ExportXml"] = xmlForMetadata;
+                metadata["Content.ExportXmlLength"] = retryExportXml.Length.ToString();
+                metadata["SafetyLoginRetrySucceeded"] = bool.TrueString;
+
+                if (xmlWasTruncated)
+                {
+                    metadata["Content.ExportXmlTruncated"] = bool.TrueString;
+                }
+
+                return;
+            }
+
             issues.Add(new HostIssue
             {
                 Scope = "OpennessTraversal",
                 Message = "Deep export XML extraction failed for runtime node.",
-                Details = $"Node: {qualifiedPath}; ObjectType: {objectType}; {exportError}"
+                Details = $"Node: {qualifiedPath}; ObjectType: {objectType}; {exportErrorText}"
             });
+
+            if (IsSafetyPermissionIssue(exportErrorText))
+            {
+                issues.Add(new HostIssue
+                {
+                    Scope = "SafetyAdministration",
+                    Message = "Safety-protected block export is not permitted even after optional login handling.",
+                    Details = $"Node: {qualifiedPath}; ObjectType: {objectType}; Retry info: {exportError}"
+                });
+            }
         }
 
         if (TryExtractSourceText(runtimeNode, out var sourceText)
@@ -2053,6 +2247,92 @@ internal static class Program
         }
 
         return false;
+    }
+
+    private static bool IsSafetyPermissionIssue(string error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            return false;
+        }
+
+        return error.Contains("not permitted", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("safety", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("f-program", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("offline program", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryLoginToSafetyContext(object runtimeNode, string qualifiedPath, ICollection<HostIssue> issues)
+    {
+        var safetyServiceTypes = ResolveSafetyAdministrationServiceTypes();
+        if (safetyServiceTypes.Length == 0)
+        {
+            return false;
+        }
+
+        object? current = runtimeNode;
+        var depth = 0;
+
+        while (current is not null && depth < 6)
+        {
+            foreach (var serviceType in safetyServiceTypes)
+            {
+                if (!TryGetService(current, serviceType, out var service, out _)
+                    || service is null)
+                {
+                    continue;
+                }
+
+                if (TryInvokeSafetyLogin(service, out var error))
+                {
+                    return true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    issues.Add(new HostIssue
+                    {
+                        Scope = "SafetyAdministration",
+                        Message = "Safety login retry failed for protected export node.",
+                        Details = $"Node: {qualifiedPath}; Service: {serviceType.FullName}; {error}"
+                    });
+                }
+            }
+
+            current = TryGetParentNode(current);
+            depth++;
+        }
+
+        return false;
+    }
+
+    private static object? TryGetParentNode(object node)
+    {
+        var parentPropertyNames = new[] { "Parent", "Owner", "ParentObject", "ParentGroup", "ContainingObject" };
+
+        foreach (var propertyName in parentPropertyNames)
+        {
+            var property = node.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+            if (property is null || !property.CanRead || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                var value = property.GetValue(node);
+                if (value is not null && !IsSimpleValue(value.GetType()))
+                {
+                    return value;
+                }
+            }
+            catch
+            {
+                // Ignore and probe next known parent property.
+            }
+        }
+
+        return null;
     }
 
     private static bool TryExtractSourceTextFromExportXml(string xml, out string sourceText)
@@ -2562,11 +2842,15 @@ internal sealed class HostOptions
 
     public IReadOnlyCollection<string> IncludedDomains { get; set; } = Array.Empty<string>();
 
+    public string? SafetyOfflineProgramPassword { get; set; }
+
     public static HostOptions Parse(string[] args, bool requireProjectPath = true)
     {
         var projectPath = GetValue(args, "--project");
         var installPath = GetValue(args, "--install");
         var rawDomains = GetValue(args, "--domains");
+        var safetyPassword = GetValue(args, "--safety-password")
+            ?? Environment.GetEnvironmentVariable("TIA_EXPORTER_SAFETY_OFFLINE_PASSWORD");
 
         if (requireProjectPath && string.IsNullOrWhiteSpace(projectPath))
         {
@@ -2583,7 +2867,8 @@ internal sealed class HostOptions
             ProjectPath = projectPath ?? string.Empty,
             InstallPath = installPath!,
             IsPreview = args.Any(argument => string.Equals(argument, "--preview", StringComparison.OrdinalIgnoreCase)),
-            IncludedDomains = ParseDomains(rawDomains)
+            IncludedDomains = ParseDomains(rawDomains),
+            SafetyOfflineProgramPassword = safetyPassword
         };
     }
 

@@ -11,7 +11,8 @@ public sealed record ExportOptions(
     bool SkipDiagnostics,
     bool GenerateMarkdownSummaries,
     string? TiaInstallationPathOverride = null,
-    IReadOnlyCollection<ExportDomain>? IncludedDomains = null)
+    IReadOnlyCollection<ExportDomain>? IncludedDomains = null,
+    string? SafetyOfflineProgramPassword = null)
 {
     /// <summary>
     /// Creates default options for an export session.
@@ -25,5 +26,6 @@ public sealed record ExportOptions(
             SkipDiagnostics: false,
             GenerateMarkdownSummaries: true,
             TiaInstallationPathOverride: null,
-            IncludedDomains: null);
+            IncludedDomains: null,
+            SafetyOfflineProgramPassword: null);
 }

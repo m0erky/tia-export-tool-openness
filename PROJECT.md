@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.48**
+Version baseline for this milestone: **0.0.49**
 
 Scope:
 
@@ -51,7 +51,7 @@ Scope:
 ## Current State Snapshot (2026-07-29)
 
 ### Version / Commit
-- Version: `0.0.48`
+- Version: `0.0.49`
 - Last commit: `see git log --oneline`
 - Branch: `main`
 
@@ -74,6 +74,11 @@ Scope:
 - Deep export XML failures for inconsistent blocks/UDTs (Siemens-side project consistency state) remain a key source of partial content and need clear operator guidance.
 
 ### Recent technical changes (latest)
+- Added optional Safety offline password flow end-to-end (UI -> export options -> inventory provider -> out-of-process host) to support SafetyAdministration login for protected block export scenarios.
+- Out-of-process adapter now forwards safety password via process environment (`TIA_EXPORTER_SAFETY_OFFLINE_PASSWORD`) to avoid command-line plaintext exposure.
+- Openness host now attempts `LoginToSafetyOfflineProgram(SecureString)` at project level (full export) and retries login around safety permission errors during per-node deep XML export.
+- Added safety retry diagnostics in host issues/metadata (`SafetyAdministration` scope, `SafetyLoginRetrySucceeded`) to make permission behavior visible in reports.
+- Added regression tests for forwarding safety password through inventory/stage layers and kept existing pipeline tests green.
 - Added shared report-domain catalog (`ReportDomainCatalog`) so `EXPORT_COVERAGE_MATRIX`, `EXPORT_READINESS_SCORE`, and `NEXT_BEST_ACTIONS` now compute discovered counts from one common domain mapping.
 - Added path/type-aware domain inference to reduce `Unknown` classification in `DOMAIN_EXTRACTOR_COVERAGE` and improve consistency for fallback objects.
 - Extended hardware typed extraction coverage:
@@ -185,8 +190,15 @@ Scope:
 - Validate Windows registry detection against actual TIA V18/V19/V20 installations and adjust key/value probing as needed.
 - Add optional auto-validation trigger when manual TIA override path changes (currently explicit Validate button).
 - Add folder-based project picker support for `.ap18/.ap19/.ap20` directory-style projects in addition to file picker.
+- Validate SafetyAdministration login flow on a Windows machine with real safety-enabled project/password combinations and tune service-type probing if needed.
 
 ## Completed Tasks
+
+- Added optional Safety offline password setting in WPF UI and wired secure input handling via `PasswordBox` event forwarding to the ViewModel.
+- Extended export contracts (`ExportOptions`, `ITiaProjectInventoryProvider`, `ITiaProjectOpennessAdapter`) to carry optional safety password through the pipeline.
+- Implemented host-side safety login and retry behavior for safety permission-denied deep export cases.
+- Extended tests to verify safety password forwarding in project inventory stage/provider flow.
+- Incremented application version to `0.0.49` in central build metadata and UI fallback version resolution.
 
 - Documented the target architecture, milestone plan, and build constraints.
 - Created the modular .NET 8 solution structure for `Core`, `Application`, `Infrastructure`, `TIA`, `Export`, `UI`, and `Tests`.

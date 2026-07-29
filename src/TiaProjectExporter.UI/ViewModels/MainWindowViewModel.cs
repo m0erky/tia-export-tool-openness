@@ -30,6 +30,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly UiLogCollector _logCollector;
     private string _projectPath = string.Empty;
     private string _tiaInstallationPathOverride = string.Empty;
+    private string _safetyOfflineProgramPassword = string.Empty;
     private string _outputDirectory;
     private bool _exportJson = true;
     private bool _exportXml = true;
@@ -287,6 +288,15 @@ public sealed class MainWindowViewModel : ObservableObject
                     : "Path changed. Click 'Validate Path' to verify TIA V20 + Openness runtime.";
             }
         }
+    }
+
+    /// <summary>
+    /// Gets or sets the optional F-program offline password used for SafetyAdministration login in Openness host.
+    /// </summary>
+    public string SafetyOfflineProgramPassword
+    {
+        get => _safetyOfflineProgramPassword;
+        set => SetProperty(ref _safetyOfflineProgramPassword, value);
     }
 
     /// <summary>
@@ -657,6 +667,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
+            var selectedDomains = BuildSelectedDomains();
             var options = new ExportOptions(
                 string.IsNullOrWhiteSpace(ProjectPath) ? null : ProjectPath,
                 OutputDirectory,
@@ -665,7 +676,13 @@ public sealed class MainWindowViewModel : ObservableObject
                 SkipDiagnostics,
                 ExportMarkdown,
                 string.IsNullOrWhiteSpace(TiaInstallationPathOverride) ? null : TiaInstallationPathOverride.Trim(),
-                BuildSelectedDomains());
+                selectedDomains,
+                string.IsNullOrWhiteSpace(SafetyOfflineProgramPassword) ? null : SafetyOfflineProgramPassword);
+
+            if (selectedDomains.Contains(ExportDomain.Blocks) && string.IsNullOrWhiteSpace(options.SafetyOfflineProgramPassword))
+            {
+                _logCollector.Add("ExportPreflight: No safety offline password configured. Protected failsafe blocks may return 'not permitted'.");
+            }
 
             var report = await _exportCoordinator.ExecuteAsync(options, HandleProgressAsync, preloadedInventory: null, cancellationTokenSource.Token);
 
@@ -933,6 +950,14 @@ public sealed class MainWindowViewModel : ObservableObject
             .ToArray();
     }
 
+    /// <summary>
+    /// Updates the optional safety password from UI controls that cannot bind securely.
+    /// </summary>
+    public void SetSafetyOfflineProgramPassword(string? password)
+    {
+        SafetyOfflineProgramPassword = password ?? string.Empty;
+    }
+
     private void ResetPreScanState(string reason)
     {
         foreach (var item in SelectableDomains)
@@ -1052,7 +1077,7 @@ public sealed class MainWindowViewModel : ObservableObject
         var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version;
         if (assemblyVersion is null)
         {
-            return "0.0.48";
+            return "0.0.49";
         }
 
         return $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";

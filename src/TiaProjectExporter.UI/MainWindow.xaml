@@ -128,6 +128,16 @@
                                TextWrapping="Wrap"
                                Text="{Binding TiaInstallationValidationText}" />
 
+                    <TextBlock Margin="0,16,0,4"
+                               Text="Safety Offline Password (optional)" />
+                    <PasswordBox x:Name="SafetyPasswordBox"
+                                 ToolTip="Optional: used for Openness SafetyAdministration login before exporting protected fail-safe blocks."
+                                 PasswordChanged="OnSafetyPasswordChanged" />
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="#52624D"
+                               TextWrapping="Wrap"
+                               Text="Leave empty if the project has no F-password. The password is used in-memory for the current export run only." />
+
                     <TextBlock Margin="0,16,0,6"
                                Text="Formats" />
                     <WrapPanel>

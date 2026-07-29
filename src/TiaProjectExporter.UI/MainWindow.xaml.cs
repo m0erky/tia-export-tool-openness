@@ -88,6 +88,16 @@ public partial class MainWindow : Window
         ScrollLogToLatest();
     }
 
+    private void OnSafetyPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel || sender is not PasswordBox passwordBox)
+        {
+            return;
+        }
+
+        viewModel.SetSafetyOfflineProgramPassword(passwordBox.Password);
+    }
+
     private void ScrollLogToLatest()
     {
         if (DataContext is not MainWindowViewModel viewModel || viewModel.LogEntries.Count == 0)

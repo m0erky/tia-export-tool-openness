@@ -35,7 +35,8 @@ public sealed class ProjectInventoryStage : IExportStage
                     context.Options.ProjectPath,
                     context.Options.TiaInstallationPathOverride,
                     cancellationToken,
-                    context.Options.IncludedDomains)
+                    context.Options.IncludedDomains,
+                    context.Options.SafetyOfflineProgramPassword)
                 .ConfigureAwait(false);
 
         inventory = ApplyDomainFilter(inventory, context.Options.IncludedDomains);

@@ -14,7 +14,8 @@ public interface ITiaProjectInventoryProvider
         string? projectPath,
         string? tiaInstallationPathOverride,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<ExportDomain>? includedDomains = null);
+        IReadOnlyCollection<ExportDomain>? includedDomains = null,
+        string? safetyOfflineProgramPassword = null);
 
     /// <summary>
     /// Builds a lightweight preview inventory used for export-scope selection.
@@ -23,5 +24,6 @@ public interface ITiaProjectInventoryProvider
         string? projectPath,
         string? tiaInstallationPathOverride,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<ExportDomain>? includedDomains = null);
+        IReadOnlyCollection<ExportDomain>? includedDomains = null,
+        string? safetyOfflineProgramPassword = null);
 }

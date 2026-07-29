@@ -23,9 +23,10 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
         string? projectPath,
         string? tiaInstallationPathOverride,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<ExportDomain>? includedDomains = null)
+        IReadOnlyCollection<ExportDomain>? includedDomains = null,
+        string? safetyOfflineProgramPassword = null)
     {
-        return await BuildInventoryInternalAsync(projectPath, tiaInstallationPathOverride, TiaTraversalDetailLevel.Full, cancellationToken, includedDomains)
+        return await BuildInventoryInternalAsync(projectPath, tiaInstallationPathOverride, TiaTraversalDetailLevel.Full, cancellationToken, includedDomains, safetyOfflineProgramPassword)
             .ConfigureAwait(false);
     }
 
@@ -34,9 +35,10 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
         string? projectPath,
         string? tiaInstallationPathOverride,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<ExportDomain>? includedDomains = null)
+        IReadOnlyCollection<ExportDomain>? includedDomains = null,
+        string? safetyOfflineProgramPassword = null)
     {
-        return await BuildInventoryInternalAsync(projectPath, tiaInstallationPathOverride, TiaTraversalDetailLevel.Preview, cancellationToken, includedDomains)
+        return await BuildInventoryInternalAsync(projectPath, tiaInstallationPathOverride, TiaTraversalDetailLevel.Preview, cancellationToken, includedDomains, safetyOfflineProgramPassword)
             .ConfigureAwait(false);
     }
 
@@ -45,7 +47,8 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
         string? tiaInstallationPathOverride,
         TiaTraversalDetailLevel detailLevel,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<ExportDomain>? includedDomains)
+        IReadOnlyCollection<ExportDomain>? includedDomains,
+        string? safetyOfflineProgramPassword)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -70,7 +73,7 @@ public sealed class OpennessBackedTiaProjectInventoryProvider : ITiaProjectInven
         try
         {
             traversal = await _opennessAdapter
-                .TraverseAsync(projectPath, tiaInstallationPathOverride, detailLevel, cancellationToken, includedDomains)
+                .TraverseAsync(projectPath, tiaInstallationPathOverride, detailLevel, cancellationToken, includedDomains, safetyOfflineProgramPassword)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)

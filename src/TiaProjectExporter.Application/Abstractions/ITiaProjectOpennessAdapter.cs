@@ -15,5 +15,6 @@ public interface ITiaProjectOpennessAdapter
         string? tiaInstallationPathOverride,
         TiaTraversalDetailLevel detailLevel,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<ExportDomain>? includedDomains = null);
+        IReadOnlyCollection<ExportDomain>? includedDomains = null,
+        string? safetyOfflineProgramPassword = null);
 }

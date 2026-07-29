@@ -38,7 +38,8 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         string? tiaInstallationPathOverride,
         TiaTraversalDetailLevel detailLevel,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<ExportDomain>? includedDomains = null)
+        IReadOnlyCollection<ExportDomain>? includedDomains = null,
+        string? safetyOfflineProgramPassword = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -96,7 +97,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
 
         try
         {
-            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, detailLevel, includedDomains, _logger, cancellationToken).ConfigureAwait(false);
+            var response = await ExecuteHostAsync(hostPath, projectPath, preferredInstallation.InstallPath, detailLevel, includedDomains, safetyOfflineProgramPassword, _logger, cancellationToken).ConfigureAwait(false);
 
             if (response is null)
             {
@@ -278,6 +279,7 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
         string installPath,
         TiaTraversalDetailLevel detailLevel,
         IReadOnlyCollection<ExportDomain>? includedDomains,
+        string? safetyOfflineProgramPassword,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -293,6 +295,11 @@ public sealed class OutOfProcessTiaProjectOpennessAdapter : ITiaProjectOpennessA
             CreateNoWindow = true,
             WorkingDirectory = Path.GetDirectoryName(hostPath) ?? AppContext.BaseDirectory
         };
+
+        if (!string.IsNullOrWhiteSpace(safetyOfflineProgramPassword))
+        {
+            startInfo.Environment["TIA_EXPORTER_SAFETY_OFFLINE_PASSWORD"] = safetyOfflineProgramPassword;
+        }
 
         using var process = new Process { StartInfo = startInfo };
 
