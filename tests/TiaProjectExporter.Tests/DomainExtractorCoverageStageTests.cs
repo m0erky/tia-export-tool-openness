@@ -36,6 +36,11 @@ public sealed class DomainExtractorCoverageStageTests
                     ["Domain"] = "HMI",
                     ["RuntimeType"] = "Siemens.Engineering.Hmi.ScreenContainer",
                     ["FallbackReflectionUsed"] = "true"
+                }),
+                new TiaProjectObjectNode("DeviceItem", "RackItem", "Project/Devices/CPU_1/DeviceItem_1", 2, new Dictionary<string, string>
+                {
+                    ["RuntimeType"] = "Siemens.Engineering.HW.DeviceItemImpl",
+                    ["FallbackReflectionUsed"] = "true"
                 })
             ],
             Issues: Array.Empty<ExportIssue>()));
@@ -56,6 +61,9 @@ public sealed class DomainExtractorCoverageStageTests
         var summary = document.RootElement.GetProperty("summary");
         Assert.True(summary.GetProperty("matrixRows").GetInt32() >= 2);
         Assert.True(summary.GetProperty("gapCount").GetInt32() >= 1);
+
+        var matrix = document.RootElement.GetProperty("matrix").EnumerateArray().ToArray();
+        Assert.DoesNotContain(matrix, row => row.GetProperty("domain").GetString() == "Unknown");
 
         var gaps = document.RootElement.GetProperty("gaps").EnumerateArray().ToArray();
         Assert.Contains(gaps, gap => gap.GetProperty("runtimeType").GetString() == "Siemens.Engineering.Hmi.ScreenContainer");

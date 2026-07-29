@@ -14,6 +14,8 @@ public sealed class ObjectUsageAnalysisStage : IExportStage
 {
     private static readonly string[] DependencyKeys = ["Calls", "DependsOn", "Uses", "References", "Dependencies", "TagUsage", "ReferencedTags"];
     private static readonly char[] DependencySeparators = [',', ';', '|'];
+    private static readonly string[] TextReferenceKeys = ["ExportXmlContent", "SourceTextContent", "Body", "NetworkSource", "Implementation"];
+    private const int MaxReferenceTextLength = 250_000;
 
     /// <inheritdoc />
     public string Name => "Usage Analysis";
@@ -70,12 +72,22 @@ public sealed class ObjectUsageAnalysisStage : IExportStage
             .GroupBy(item => item.Source.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
+        var tagNodes = objects.Where(node => IsTagNode(node.Source)).ToArray();
+        var tagsByName = tagNodes
+            .GroupBy(node => node.Source.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var knownTagNames = tagsByName.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var inboundById = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var source in objects)
         {
+            var referencedTagNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var targetToken in ParseDependencies(source.Source.Metadata))
             {
+                TryAddTagReference(targetToken, knownTagNames, referencedTagNames);
+
                 var target = ResolveTarget(targetToken, byId, byName);
                 if (target is null)
                 {
@@ -84,9 +96,23 @@ public sealed class ObjectUsageAnalysisStage : IExportStage
 
                 inboundById[target.Id] = inboundById.TryGetValue(target.Id, out var count) ? count + 1 : 1;
             }
+
+            foreach (var referencedTag in ParseTagReferencesFromText(source.Source.Metadata, knownTagNames))
+            {
+                referencedTagNames.Add(referencedTag);
+            }
+
+            foreach (var referencedTag in referencedTagNames)
+            {
+                if (!tagsByName.TryGetValue(referencedTag, out var tagNode))
+                {
+                    continue;
+                }
+
+                inboundById[tagNode.Id] = inboundById.TryGetValue(tagNode.Id, out var count) ? count + 1 : 1;
+            }
         }
 
-        var tagNodes = objects.Where(node => IsTagNode(node.Source)).ToArray();
         var tagUsage = tagNodes
             .Select(tag => new TagUsageItem(
                 tag.Source.Name,
@@ -193,6 +219,95 @@ public sealed class ObjectUsageAnalysisStage : IExportStage
     private static IEnumerable<string> SplitValues(string raw)
     {
         return raw.Split(DependencySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static void TryAddTagReference(string token, IReadOnlySet<string> knownTagNames, ISet<string> references)
+    {
+        var normalized = RelationshipTargetResolver.NormalizeTarget(token);
+
+        if (knownTagNames.Contains(normalized))
+        {
+            references.Add(normalized);
+            return;
+        }
+
+        var separatorIndex = normalized.LastIndexOf('/');
+        if (separatorIndex >= 0)
+        {
+            var tail = normalized[(separatorIndex + 1)..];
+            if (knownTagNames.Contains(tail))
+            {
+                references.Add(tail);
+            }
+        }
+    }
+
+    private static IEnumerable<string> ParseTagReferencesFromText(IReadOnlyDictionary<string, string>? metadata, IReadOnlySet<string> knownTagNames)
+    {
+        if (metadata is null || knownTagNames.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var matches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var key in TextReferenceKeys)
+        {
+            if (!metadata.TryGetValue(key, out var content) || string.IsNullOrWhiteSpace(content))
+            {
+                continue;
+            }
+
+            AddIdentifierMatches(content, knownTagNames, matches);
+        }
+
+        return matches;
+    }
+
+    private static void AddIdentifierMatches(string content, IReadOnlySet<string> knownIdentifiers, ISet<string> matches)
+    {
+        var span = content.Length > MaxReferenceTextLength
+            ? content.AsSpan(0, MaxReferenceTextLength)
+            : content.AsSpan();
+
+        var buffer = new char[128];
+        var bufferLength = 0;
+
+        for (var index = 0; index < span.Length; index++)
+        {
+            var character = span[index];
+            var isIdentifierChar = char.IsLetterOrDigit(character) || character == '_';
+
+            if (isIdentifierChar)
+            {
+                if (bufferLength < buffer.Length)
+                {
+                    buffer[bufferLength++] = character;
+                }
+
+                continue;
+            }
+
+            FlushToken(buffer, ref bufferLength, knownIdentifiers, matches);
+        }
+
+        FlushToken(buffer, ref bufferLength, knownIdentifiers, matches);
+    }
+
+    private static void FlushToken(char[] buffer, ref int bufferLength, IReadOnlySet<string> knownIdentifiers, ISet<string> matches)
+    {
+        if (bufferLength == 0)
+        {
+            return;
+        }
+
+        var token = new string(buffer, 0, bufferLength);
+        if (knownIdentifiers.Contains(token))
+        {
+            matches.Add(token);
+        }
+
+        bufferLength = 0;
     }
 
     private static Node? ResolveTarget(string token, IReadOnlyDictionary<string, Node> byId, IReadOnlyDictionary<string, Node> byName)

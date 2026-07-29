@@ -13,37 +13,6 @@ namespace TiaProjectExporter.Export.Stages;
 public sealed class ExportReadinessStage : IExportStage
 {
     private static readonly char[] DependencySeparators = [',', ';', '|'];
-    private static readonly IReadOnlyDictionary<string, bool> SupportedByApiMap = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Project"] = true,
-        ["Hardware"] = true,
-        ["Network"] = true,
-        ["PLC.Blocks"] = true,
-        ["PLC.Tags"] = true,
-        ["PLC.DataTypes"] = true,
-        ["HMI"] = true,
-        ["Libraries"] = true,
-        ["Diagnostics"] = true,
-        ["Technology"] = true,
-        ["Metadata"] = false,
-        ["UsersAudit"] = true
-    };
-
-    private static readonly string[] DomainOrder =
-    [
-        "Project",
-        "Hardware",
-        "Network",
-        "PLC.Blocks",
-        "PLC.Tags",
-        "PLC.DataTypes",
-        "HMI",
-        "Libraries",
-        "Diagnostics",
-        "Technology",
-        "Metadata",
-        "UsersAudit"
-    ];
 
     private static readonly IReadOnlyDictionary<string, string> RelationshipByMetadataKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -105,13 +74,13 @@ public sealed class ExportReadinessStage : IExportStage
 
         var relationships = inventory.Objects
             .SelectMany(source => ParseRelationships(source.Metadata).Select(relation => new RelationshipEdge(
-                SourceDomain: ResolveDomain(source),
+                SourceDomain: ReportDomainCatalog.ResolveDomain(source),
                 Target: relation.Target,
                 Resolved: RelationshipTargetResolver.IsResolvedTarget(relation.Target, nodeIds, nodeNames),
                 Relationship: relation.Relationship)))
             .ToArray();
 
-        var domainScores = DomainOrder
+        var domainScores = ReportDomainCatalog.DomainOrder
             .Select(domain => BuildDomainScore(domain, inventory, relationships))
             .OrderByDescending(entry => entry.Score)
             .ThenBy(entry => entry.Domain, StringComparer.OrdinalIgnoreCase)
@@ -144,7 +113,7 @@ public sealed class ExportReadinessStage : IExportStage
 
     private static DomainScore BuildDomainScore(string domain, TiaProjectInventory inventory, IReadOnlyList<RelationshipEdge> relationships)
     {
-        var nodes = inventory.Objects.Where(node => DomainMatches(node, domain)).ToArray();
+        var nodes = inventory.Objects.Where(node => ReportDomainCatalog.DomainMatches(node, domain)).ToArray();
         var discovered = nodes.Length;
 
         var confident = nodes.Count(node =>
@@ -168,9 +137,7 @@ public sealed class ExportReadinessStage : IExportStage
         var domainRelationships = relationships.Where(edge => edge.SourceDomain.Equals(domain, StringComparison.OrdinalIgnoreCase)).ToArray();
         var unresolved = domainRelationships.Count(edge => !edge.Resolved);
 
-        var issues = inventory.Issues.Count(issue =>
-            issue.Scope.Contains(domain, StringComparison.OrdinalIgnoreCase)
-            || issue.Message.Contains(domain, StringComparison.OrdinalIgnoreCase));
+        var issues = ReportDomainCatalog.CountIssuesForDomain(inventory, domain);
 
         var discoveryScore = discovered == 0 ? 0 : 40;
         var confidenceScore = discovered == 0 ? 0 : (int)Math.Round((confident / (double)discovered) * 20, MidpointRounding.AwayFromZero);
@@ -182,7 +149,7 @@ public sealed class ExportReadinessStage : IExportStage
         var issuePenalty = Math.Min(10, issues * 2);
 
         var score = Math.Clamp(discoveryScore + confidenceScore + typedScore - fallbackPenalty - unresolvedPenalty - issuePenalty, 0, 100);
-        var supportedByApi = SupportedByApiMap.TryGetValue(domain, out var supported) && supported;
+        var supportedByApi = ReportDomainCatalog.SupportedByApiMap.TryGetValue(domain, out var supported) && supported;
 
         var actions = BuildActions(discovered, confident, typed, fallback, unresolved, issues, supportedByApi);
 
@@ -288,60 +255,6 @@ public sealed class ExportReadinessStage : IExportStage
         }
 
         return builder.ToString();
-    }
-
-    private static string ResolveDomain(TiaProjectObjectNode node)
-    {
-        if (node.Metadata is not null
-            && node.Metadata.TryGetValue("Domain", out var domain)
-            && !string.IsNullOrWhiteSpace(domain))
-        {
-            return domain;
-        }
-
-        return DomainOrder.FirstOrDefault(domain => DomainMatches(node, domain)) ?? "Unknown";
-    }
-
-    private static bool DomainMatches(TiaProjectObjectNode node, string domain)
-    {
-        if (node.Metadata is not null
-            && node.Metadata.TryGetValue("Domain", out var metadataDomain)
-            && metadataDomain.Equals(domain, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return domain switch
-        {
-            "Project" => node.ObjectType.Equals("Project", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Equals("ProjectMetadata", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Project", StringComparison.OrdinalIgnoreCase),
-            "Hardware" => node.ObjectType.Contains("Device", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Module", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Rack", StringComparison.OrdinalIgnoreCase),
-            "Network" => node.ObjectType.Contains("Network", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("PROFINET", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("PROFIBUS", StringComparison.OrdinalIgnoreCase)
-                || node.QualifiedPath.Contains("/Network/", StringComparison.OrdinalIgnoreCase),
-            "PLC.Blocks" => node.ObjectType is "OB" or "FB" or "FC" or "DB" or "Block" or "InstanceDB",
-            "PLC.Tags" => node.ObjectType.Contains("Tag", StringComparison.OrdinalIgnoreCase),
-            "PLC.DataTypes" => node.ObjectType.Contains("UDT", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("DataType", StringComparison.OrdinalIgnoreCase),
-            "HMI" => node.ObjectType.Contains("HMI", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Screen", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Faceplate", StringComparison.OrdinalIgnoreCase),
-            "Libraries" => node.ObjectType.Contains("Library", StringComparison.OrdinalIgnoreCase),
-            "Diagnostics" => node.ObjectType.Contains("Diagnostic", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Alarm", StringComparison.OrdinalIgnoreCase),
-            "Technology" => node.ObjectType.Contains("Technology", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Motion", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Safety", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("PID", StringComparison.OrdinalIgnoreCase),
-            "Metadata" => node.ObjectType.Contains("Metadata", StringComparison.OrdinalIgnoreCase),
-            "UsersAudit" => node.ObjectType.Contains("User", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Audit", StringComparison.OrdinalIgnoreCase),
-            _ => false
-        };
     }
 
     private static IReadOnlyList<DependencyRelation> ParseRelationships(IReadOnlyDictionary<string, string>? metadata)

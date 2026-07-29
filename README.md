@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.47`
+- Current application version: `0.0.48`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -104,6 +104,11 @@ If build complains about SDK mismatch, install that SDK first.
 - Per-block exports: blocks are now exported additionally as single-object artifacts under `Export/Blocks/ByName` (JSON/Markdown, optional XML) with `INDEX.json` for direct engineering lookup.
 - Call relationship extraction hardening: call/dependency/relationship analysis now also parses `Content.ExportXml` (`<CallInfo ...>`) so OB network calls are detected even when `Calls` metadata is not present.
 - Instance target mapping: call targets referencing instance DB names are mapped via `InstanceOfName`/`InstanceOf`/`DataType` to FB targets for consistent graph edges.
+- Report-domain metric unification: `EXPORT_COVERAGE_MATRIX`, `EXPORT_READINESS_SCORE`, and `NEXT_BEST_ACTIONS` now share one domain mapping source to keep discovered counts consistent.
+- Domain extractor coverage now resolves fallback objects through shared domain inference, reducing `Unknown` buckets.
+- Hardware typed extraction now includes Siemens hardware runtime patterns `DeviceItemImpl`, `HwIdentifier`, and `Address`.
+- Usage analysis now resolves tag usage from dependency metadata plus deep content (`ExportXmlContent`/`SourceTextContent`) for more realistic tag-use signals.
+- Traversal recursion guard: out-of-process host now skips likely recursive hardware path expansions (for example repeated `DeviceItemImpl` chains) to reduce structure noise and stabilize large-project traversal.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 

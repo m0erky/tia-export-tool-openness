@@ -796,6 +796,7 @@ internal static class Program
 
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var discoveredCount = 0;
+        var recursivePathSkips = 0;
 
         while (queue.Count > 0)
         {
@@ -830,6 +831,23 @@ internal static class Program
                 var childName = TryReadString(child, "Name") ?? TryReadString(child, "DisplayName") ?? child.GetType().Name;
                 var childPath = $"{current.Path}/{childName}";
                 var childTypeName = child.GetType().Name;
+
+                if (IsLikelyRecursiveHardwarePath(childPath))
+                {
+                    recursivePathSkips++;
+                    if (recursivePathSkips <= 8)
+                    {
+                        issues.Add(new HostIssue
+                        {
+                            Scope = "OpennessTraversal",
+                            Message = "Skipping likely recursive hardware path expansion.",
+                            Details = $"Path: {childPath}"
+                        });
+                    }
+
+                    continue;
+                }
+
                 var objectType = ClassifyObjectType(childTypeName, childPath);
                 var dedupKey = $"{objectType}|{childPath}";
 
@@ -898,6 +916,7 @@ internal static class Program
         }
 
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var recursivePathSkips = 0;
 
         while (queue.Count > 0)
         {
@@ -930,6 +949,23 @@ internal static class Program
                 var childPath = string.IsNullOrWhiteSpace(candidate.Path)
                     ? $"{current.Path}/{childName}"
                     : candidate.Path!;
+
+                if (IsLikelyRecursiveHardwarePath(childPath))
+                {
+                    recursivePathSkips++;
+                    if (recursivePathSkips <= 8)
+                    {
+                        issues.Add(new HostIssue
+                        {
+                            Scope = "OpennessTraversal",
+                            Message = "Skipping likely recursive hardware path expansion in PLC traversal.",
+                            Details = $"Path: {childPath}"
+                        });
+                    }
+
+                    continue;
+                }
+
                 var objectType = string.IsNullOrWhiteSpace(candidate.ObjectType)
                     ? ClassifyPlcObjectType(child, childPath)
                     : candidate.ObjectType!;
@@ -2282,6 +2318,46 @@ internal static class Program
             || path.Contains("/TechnologyObjects/", StringComparison.OrdinalIgnoreCase)
             || path.Contains("/ExternalSources/", StringComparison.OrdinalIgnoreCase)
             || path.Contains("/Sources/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsLikelyRecursiveHardwarePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        return path.Contains("/DeviceItemImpl/DeviceItemImpl/DeviceItemImpl", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/HwIdentifier/HwIdentifier/HwIdentifier", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("/Address/Address/Address", StringComparison.OrdinalIgnoreCase)
+            || HasRepeatedPathSegment(path, "DeviceItemImpl", 3)
+            || HasRepeatedPathSegment(path, "HwIdentifier", 3)
+            || HasRepeatedPathSegment(path, "Address", 4);
+    }
+
+    private static bool HasRepeatedPathSegment(string path, string segment, int minRun)
+    {
+        var parts = path
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        var run = 0;
+        foreach (var part in parts)
+        {
+            if (part.Equals(segment, StringComparison.OrdinalIgnoreCase))
+            {
+                run++;
+                if (run >= minRun)
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            run = 0;
+        }
+
+        return false;
     }
 
     private static bool ContainsAny(string candidate, params string[] terms) =>

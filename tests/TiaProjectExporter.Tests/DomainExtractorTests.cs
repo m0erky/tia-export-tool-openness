@@ -30,6 +30,51 @@ public sealed class DomainExtractorTests
     }
 
     [Fact]
+    public void HardwareDomainExtractor_MapsDeviceItemImplHwIdentifierAndAddressTypes()
+    {
+        var extractor = new HardwareDomainExtractor();
+
+        var deviceItem = extractor.TryExtract(
+            new DeviceItemImpl
+            {
+                Name = "DeviceItem_1",
+                Identifier = "DI-001"
+            },
+            "Project/Devices/CPU_1/DeviceItem_1",
+            3);
+
+        Assert.NotNull(deviceItem);
+        Assert.Equal("DeviceItem", deviceItem.ObjectType);
+        Assert.Equal("DI-001", deviceItem.Metadata?["HardwareIdentifier"]);
+
+        var hardwareIdentifier = extractor.TryExtract(
+            new HwIdentifier
+            {
+                Name = "HwId_1",
+                Id = "HW-42"
+            },
+            "Project/Devices/CPU_1/HwId_1",
+            3);
+
+        Assert.NotNull(hardwareIdentifier);
+        Assert.Equal("HardwareIdentifier", hardwareIdentifier.ObjectType);
+        Assert.Equal("HW-42", hardwareIdentifier.Metadata?["HardwareIdentifier"]);
+
+        var address = extractor.TryExtract(
+            new Address
+            {
+                Name = "Address_1",
+                LogicalAddress = "%I0.0"
+            },
+            "Project/Devices/CPU_1/Address_1",
+            3);
+
+        Assert.NotNull(address);
+        Assert.Equal("HardwareAddress", address.ObjectType);
+        Assert.Equal("%I0.0", address.Metadata?["Address"]);
+    }
+
+    [Fact]
     public void NetworkDomainExtractor_ExtractsNetworkDependencies()
     {
         var extractor = new NetworkDomainExtractor();
@@ -81,5 +126,26 @@ public sealed class DomainExtractorTests
         public IEnumerable<NamedNode>? Connections { get; init; }
 
         public string? SubnetName { get; init; }
+    }
+
+    private sealed class DeviceItemImpl
+    {
+        public string? Name { get; init; }
+
+        public string? Identifier { get; init; }
+    }
+
+    private sealed class HwIdentifier
+    {
+        public string? Name { get; init; }
+
+        public string? Id { get; init; }
+    }
+
+    private sealed class Address
+    {
+        public string? Name { get; init; }
+
+        public string? LogicalAddress { get; init; }
     }
 }

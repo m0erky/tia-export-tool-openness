@@ -12,38 +12,6 @@ namespace TiaProjectExporter.Export.Stages;
 /// </summary>
 public sealed class ExportCoverageMatrixStage : IExportStage
 {
-    private static readonly IReadOnlyDictionary<string, bool> SupportedByApiMap = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Project"] = true,
-        ["Hardware"] = true,
-        ["Network"] = true,
-        ["PLC.Blocks"] = true,
-        ["PLC.Tags"] = true,
-        ["PLC.DataTypes"] = true,
-        ["HMI"] = true,
-        ["Libraries"] = true,
-        ["Diagnostics"] = true,
-        ["Technology"] = true,
-        ["Metadata"] = false,
-        ["UsersAudit"] = true
-    };
-
-    private static readonly string[] DomainOrder =
-    [
-        "Project",
-        "Hardware",
-        "Network",
-        "PLC.Blocks",
-        "PLC.Tags",
-        "PLC.DataTypes",
-        "HMI",
-        "Libraries",
-        "Diagnostics",
-        "Technology",
-        "Metadata",
-        "UsersAudit"
-    ];
-
     /// <inheritdoc />
     public string Name => "Coverage Matrix";
 
@@ -98,9 +66,9 @@ public sealed class ExportCoverageMatrixStage : IExportStage
 
     private static IEnumerable<CoverageEntry> BuildEntries(TiaProjectInventory inventory)
     {
-        foreach (var domain in DomainOrder)
+        foreach (var domain in ReportDomainCatalog.DomainOrder)
         {
-            var domainNodes = inventory.Objects.Where(node => DomainMatches(node, domain)).ToArray();
+            var domainNodes = inventory.Objects.Where(node => ReportDomainCatalog.DomainMatches(node, domain)).ToArray();
             var discovered = domainNodes.Length;
 
             var confident = domainNodes.Count(node =>
@@ -109,9 +77,7 @@ public sealed class ExportCoverageMatrixStage : IExportStage
                 && double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var score)
                 && score >= 0.70);
 
-            var issues = inventory.Issues.Count(issue =>
-                issue.Scope.Contains(domain, StringComparison.OrdinalIgnoreCase)
-                || issue.Message.Contains(domain, StringComparison.OrdinalIgnoreCase));
+            var issues = ReportDomainCatalog.CountIssuesForDomain(inventory, domain);
 
             var typedCount = domainNodes.Count(node =>
                 node.Metadata is not null
@@ -133,7 +99,7 @@ public sealed class ExportCoverageMatrixStage : IExportStage
                         ? "PartialCandidate"
                         : "LowConfidence";
 
-            var supportedByApi = SupportedByApiMap.TryGetValue(domain, out var supported) && supported;
+            var supportedByApi = ReportDomainCatalog.SupportedByApiMap.TryGetValue(domain, out var supported) && supported;
 
             yield return new CoverageEntry(
                 Domain: domain,
@@ -147,42 +113,6 @@ public sealed class ExportCoverageMatrixStage : IExportStage
                 ExtractedByTypedExtractor: typedCount > 0,
                 FallbackReflectionUsed: fallbackCount > 0);
         }
-    }
-
-    private static bool DomainMatches(TiaProjectObjectNode node, string domain)
-    {
-        if (node.Metadata is not null
-            && node.Metadata.TryGetValue("Domain", out var metadataDomain)
-            && metadataDomain.Equals(domain, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return domain switch
-        {
-            "Project" => node.ObjectType.Equals("Project", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Equals("ProjectMetadata", StringComparison.OrdinalIgnoreCase),
-            "Hardware" => node.ObjectType.Contains("Device", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Module", StringComparison.OrdinalIgnoreCase),
-            "Network" => node.ObjectType.Contains("Network", StringComparison.OrdinalIgnoreCase)
-                || node.QualifiedPath.Contains("/Network/", StringComparison.OrdinalIgnoreCase),
-            "PLC.Blocks" => node.ObjectType is "OB" or "FB" or "FC" or "DB" or "Block",
-            "PLC.Tags" => node.ObjectType.Contains("Tag", StringComparison.OrdinalIgnoreCase),
-            "PLC.DataTypes" => node.ObjectType.Contains("UDT", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("DataType", StringComparison.OrdinalIgnoreCase),
-            "HMI" => node.ObjectType.Contains("HMI", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Screen", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Faceplate", StringComparison.OrdinalIgnoreCase),
-            "Libraries" => node.ObjectType.Contains("Library", StringComparison.OrdinalIgnoreCase),
-            "Diagnostics" => node.ObjectType.Contains("Diagnostic", StringComparison.OrdinalIgnoreCase),
-            "Technology" => node.ObjectType.Contains("Technology", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Motion", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Safety", StringComparison.OrdinalIgnoreCase),
-            "Metadata" => node.ObjectType.Contains("Metadata", StringComparison.OrdinalIgnoreCase),
-            "UsersAudit" => node.ObjectType.Contains("User", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Audit", StringComparison.OrdinalIgnoreCase),
-            _ => false
-        };
     }
 
     private static string BuildMarkdown(TiaProjectInventory inventory, IReadOnlyCollection<CoverageEntry> entries)

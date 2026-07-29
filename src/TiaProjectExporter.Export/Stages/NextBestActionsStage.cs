@@ -13,21 +13,6 @@ namespace TiaProjectExporter.Export.Stages;
 public sealed class NextBestActionsStage : IExportStage
 {
     private static readonly char[] DependencySeparators = [',', ';', '|'];
-    private static readonly string[] DomainOrder =
-    [
-        "Project",
-        "Hardware",
-        "Network",
-        "PLC.Blocks",
-        "PLC.Tags",
-        "PLC.DataTypes",
-        "HMI",
-        "Libraries",
-        "Diagnostics",
-        "Technology",
-        "Metadata",
-        "UsersAudit"
-    ];
 
     private static readonly IReadOnlyDictionary<string, string> RelationshipByMetadataKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -90,7 +75,7 @@ public sealed class NextBestActionsStage : IExportStage
         var unresolvedByDomain = inventory.Objects
             .SelectMany(source => ParseRelationships(source.Metadata).Select(relation => new
             {
-                Domain = ResolveDomain(source),
+                Domain = ReportDomainCatalog.ResolveDomain(source),
                 relation.Target,
                 Resolved = RelationshipTargetResolver.IsResolvedTarget(relation.Target, nodeIds, nodeNames)
             }))
@@ -107,7 +92,7 @@ public sealed class NextBestActionsStage : IExportStage
                     .ToArray(),
                 StringComparer.OrdinalIgnoreCase);
 
-        var readiness = DomainOrder
+        var readiness = ReportDomainCatalog.DomainOrder
             .Select(domain => BuildDomainInput(domain, inventory, unresolvedByDomain))
             .ToArray();
 
@@ -141,7 +126,7 @@ public sealed class NextBestActionsStage : IExportStage
         TiaProjectInventory inventory,
         IReadOnlyDictionary<string, Hotspot[]> unresolvedByDomain)
     {
-        var nodes = inventory.Objects.Where(node => DomainMatches(node, domain)).ToArray();
+        var nodes = inventory.Objects.Where(node => ReportDomainCatalog.DomainMatches(node, domain)).ToArray();
         var discovered = nodes.Length;
         var typed = nodes.Count(node => IsTrue(node.Metadata, "ExtractedByTypedExtractor"));
         var fallback = nodes.Count(node => IsTrue(node.Metadata, "FallbackReflectionUsed"));
@@ -151,9 +136,7 @@ public sealed class NextBestActionsStage : IExportStage
             || !double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var score)
             || score < 0.70);
 
-        var issues = inventory.Issues.Count(issue =>
-            issue.Scope.Contains(domain, StringComparison.OrdinalIgnoreCase)
-            || issue.Message.Contains(domain, StringComparison.OrdinalIgnoreCase));
+        var issues = ReportDomainCatalog.CountIssuesForDomain(inventory, domain);
 
         unresolvedByDomain.TryGetValue(domain, out var unresolvedHotspots);
 
@@ -300,60 +283,6 @@ public sealed class NextBestActionsStage : IExportStage
     {
         var seed = string.IsNullOrWhiteSpace(node.QualifiedPath) ? node.Name : node.QualifiedPath;
         return seed.Trim().Replace(' ', '_');
-    }
-
-    private static string ResolveDomain(TiaProjectObjectNode node)
-    {
-        if (node.Metadata is not null
-            && node.Metadata.TryGetValue("Domain", out var domain)
-            && !string.IsNullOrWhiteSpace(domain))
-        {
-            return domain;
-        }
-
-        return DomainOrder.FirstOrDefault(domain => DomainMatches(node, domain)) ?? "Unknown";
-    }
-
-    private static bool DomainMatches(TiaProjectObjectNode node, string domain)
-    {
-        if (node.Metadata is not null
-            && node.Metadata.TryGetValue("Domain", out var metadataDomain)
-            && metadataDomain.Equals(domain, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return domain switch
-        {
-            "Project" => node.ObjectType.Equals("Project", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Equals("ProjectMetadata", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Project", StringComparison.OrdinalIgnoreCase),
-            "Hardware" => node.ObjectType.Contains("Device", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Module", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Rack", StringComparison.OrdinalIgnoreCase),
-            "Network" => node.ObjectType.Contains("Network", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("PROFINET", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("PROFIBUS", StringComparison.OrdinalIgnoreCase)
-                || node.QualifiedPath.Contains("/Network/", StringComparison.OrdinalIgnoreCase),
-            "PLC.Blocks" => node.ObjectType is "OB" or "FB" or "FC" or "DB" or "Block" or "InstanceDB",
-            "PLC.Tags" => node.ObjectType.Contains("Tag", StringComparison.OrdinalIgnoreCase),
-            "PLC.DataTypes" => node.ObjectType.Contains("UDT", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("DataType", StringComparison.OrdinalIgnoreCase),
-            "HMI" => node.ObjectType.Contains("HMI", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Screen", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Faceplate", StringComparison.OrdinalIgnoreCase),
-            "Libraries" => node.ObjectType.Contains("Library", StringComparison.OrdinalIgnoreCase),
-            "Diagnostics" => node.ObjectType.Contains("Diagnostic", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Alarm", StringComparison.OrdinalIgnoreCase),
-            "Technology" => node.ObjectType.Contains("Technology", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Motion", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Safety", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("PID", StringComparison.OrdinalIgnoreCase),
-            "Metadata" => node.ObjectType.Contains("Metadata", StringComparison.OrdinalIgnoreCase),
-            "UsersAudit" => node.ObjectType.Contains("User", StringComparison.OrdinalIgnoreCase)
-                || node.ObjectType.Contains("Audit", StringComparison.OrdinalIgnoreCase),
-            _ => false
-        };
     }
 
     private sealed record DependencyRelation(string Target, string Relationship);

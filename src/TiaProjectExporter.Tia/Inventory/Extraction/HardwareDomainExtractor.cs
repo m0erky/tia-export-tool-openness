@@ -57,11 +57,44 @@ public sealed class HardwareDomainExtractor : ITiaDomainExtractor
             metadata["Position"] = position;
         }
 
+        var hardwareIdentifier = ReflectionNodeIntrospection.TryReadString(runtimeNode, "Identifier")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "HwIdentifier")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "Id");
+        if (!string.IsNullOrWhiteSpace(hardwareIdentifier))
+        {
+            metadata["HardwareIdentifier"] = hardwareIdentifier;
+        }
+
+        var address = ReflectionNodeIntrospection.TryReadString(runtimeNode, "Address")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "LogicalAddress")
+            ?? ReflectionNodeIntrospection.TryReadString(runtimeNode, "StartAddress");
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            metadata["Address"] = address;
+        }
+
         return new TiaProjectObjectNode(objectType, name, qualifiedPath, depth, metadata);
     }
 
     private static string? Classify(string runtimeTypeName)
     {
+        if (runtimeTypeName.Contains("DeviceItemImpl", StringComparison.OrdinalIgnoreCase))
+        {
+            return "DeviceItem";
+        }
+
+        if (runtimeTypeName.Contains("HwIdentifier", StringComparison.OrdinalIgnoreCase))
+        {
+            return "HardwareIdentifier";
+        }
+
+        if (runtimeTypeName.Equals("Address", StringComparison.OrdinalIgnoreCase)
+            || runtimeTypeName.Contains("HwAddress", StringComparison.OrdinalIgnoreCase)
+            || runtimeTypeName.Contains("HardwareAddress", StringComparison.OrdinalIgnoreCase))
+        {
+            return "HardwareAddress";
+        }
+
         if (runtimeTypeName.Contains("Device", StringComparison.OrdinalIgnoreCase))
         {
             return "Device";

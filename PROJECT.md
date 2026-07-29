@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.47**
+Version baseline for this milestone: **0.0.48**
 
 Scope:
 
@@ -51,8 +51,8 @@ Scope:
 ## Current State Snapshot (2026-07-29)
 
 ### Version / Commit
-- Version: `0.0.47`
-- Last commit: `02b6eab`
+- Version: `0.0.48`
+- Last commit: `see git log --oneline`
 - Branch: `main`
 
 ### Goal Right Now
@@ -70,10 +70,25 @@ Scope:
 - Full export now forwards selected domains into host traversal for domain-aware export scope reduction.
 
 ### Current critical issue
-- Some projects expose valid OB call information only inside export XML (`<CallInfo ...>`). If not parsed, call/dependency/relationship artifacts can show zero edges despite real calls.
+- Hardware/domain quality is still below target on large projects when many runtime nodes arrive as fallback-only objects; confidence and semantic richness are not yet fully production-grade.
 - Deep export XML failures for inconsistent blocks/UDTs (Siemens-side project consistency state) remain a key source of partial content and need clear operator guidance.
 
 ### Recent technical changes (latest)
+- Added shared report-domain catalog (`ReportDomainCatalog`) so `EXPORT_COVERAGE_MATRIX`, `EXPORT_READINESS_SCORE`, and `NEXT_BEST_ACTIONS` now compute discovered counts from one common domain mapping.
+- Added path/type-aware domain inference to reduce `Unknown` classification in `DOMAIN_EXTRACTOR_COVERAGE` and improve consistency for fallback objects.
+- Extended hardware typed extraction coverage:
+  - `HardwareDomainExtractor` now maps `DeviceItemImpl`, `HwIdentifier`, and `Address` runtime nodes.
+  - hardware metadata enrichment now includes `HardwareIdentifier` and `Address` when exposed by runtime objects.
+- Added traversal guard in out-of-process host to skip likely recursive hardware path expansion patterns (for example repeated `DeviceItemImpl` chains), reducing structural noise and memory churn risks.
+- Improved tag-usage analysis:
+  - `ObjectUsageAnalysisStage` now combines dependency metadata with deep-content text references (`ExportXmlContent`, `SourceTextContent`, etc.).
+  - known tag identifiers referenced in XML/source are now counted as usage edges.
+- Hardened PLC data type discovery in reporting by treating type-path/runtime-type signals (`/TypeGroup`, `/Types`, `PlcStruct`, `UserDataType`, etc.) as `PLC.DataTypes` domain evidence.
+- Added tests for:
+  - cross-report domain discovered-count consistency (`Coverage`/`Readiness`/`NextBestActions`)
+  - hardware extractor support for `DeviceItemImpl`/`HwIdentifier`/`Address`
+  - tag usage extraction from export XML content
+  - reduced `Unknown` rows in domain extractor coverage output.
 - Added shared call-relationship extractor (`CallRelationshipExtractor`) for analysis stages:
   - parses call targets from metadata (`Calls`, `BlockCalls`, `InvokedBlocks`, `CalledBlocks`)
   - additionally parses `<CallInfo Name="...">` from `Content.ExportXml`
@@ -135,11 +150,9 @@ Scope:
 - Keep bundle-first output structure for large projects.
 
 ### Next 3 steps (priority)
-1. Validate XML-backed call extraction on Windows real projects (V18/V19/V20):
-   - confirm OB `CallInfo` edges appear consistently in `BLOCK_CALL_GRAPH`, `DEPENDENCIES`, and `RELATIONSHIP_INSIGHTS`.
-2. Add operator-facing guidance for Siemens inconsistency export errors:
-   - explicit remediation hints in reports/UI for "Inconsistent blocks and PLC data types (UDT) cannot be exported".
-3. Expand by-name block exports with optional cross-links to call/dependency insights for faster engineering reviews.
+1. Finish high-volume hardware typed mappings beyond `DeviceItemImpl`/`HwIdentifier`/`Address` to reduce fallback-only hardware nodes in real projects.
+2. Add Siemens-consistency remediation guidance in report/UI for "Inconsistent blocks and PLC data types (UDT) cannot be exported" failures.
+3. Validate Windows full-export runs on large projects and tune traversal limits/guards using measured memory/time baselines.
 
 ### Validation checklist
 - [x] `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj --no-restore -v minimal`
@@ -147,6 +160,9 @@ Scope:
 - [x] Dedup unit tests cover canonicalization patterns + conflict-resolution priorities.
 - [x] Per-block export tests cover by-name artifacts + index generation.
 - [x] XML call parsing tests cover OB `<CallInfo>` extraction and instance mapping.
+- [x] Report domain discovered counts are consistent across Coverage/Readiness/NextBestActions.
+- [x] Tag usage detects XML/source references for known tags.
+- [x] Hardware typed extraction includes `DeviceItemImpl`/`HwIdentifier`/`Address`.
 - [ ] UI: `Scan Project Contents` shows non-zero Blocks for known project with FB/FC/DB.
 - [ ] UI: Export runs after scan with default selections.
 - [ ] UI: Single-domain export (for example only `Blocks`) does not traverse unrelated domains in host runtime logs.

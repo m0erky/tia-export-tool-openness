@@ -58,9 +58,7 @@ public sealed class DomainExtractorCoverageStage : IExportStage
                     return null;
                 }
 
-                var domain = metadata.TryGetValue("Domain", out var domainValue) && !string.IsNullOrWhiteSpace(domainValue)
-                    ? domainValue
-                    : "Unknown";
+                var domain = ReportDomainCatalog.ResolveDomain(node);
 
                 var typedExtractor = metadata.TryGetValue("TypedExtractor", out var extractor)
                     ? extractor
