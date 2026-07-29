@@ -90,8 +90,10 @@ public sealed class DependencyGraphStage : IExportStage
             .Select(node => node.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var instanceTargetMap = CallRelationshipExtractor.BuildInstanceTargetMap(inventory);
+
         var edges = inventory.Objects
-            .SelectMany(source => ParseDependencies(source.Metadata).Select(relation => new
+            .SelectMany(source => ParseDependencies(source.Metadata, instanceTargetMap).Select(relation => new
             {
                 SourceId = BuildNodeId(source),
                 SourceName = source.Name,
@@ -155,16 +157,27 @@ public sealed class DependencyGraphStage : IExportStage
         return seed.Trim().Replace(' ', '_');
     }
 
-    private static IReadOnlyCollection<DependencyRelation> ParseDependencies(IReadOnlyDictionary<string, string>? metadata)
+    private static IReadOnlyCollection<DependencyRelation> ParseDependencies(
+        IReadOnlyDictionary<string, string>? metadata,
+        IReadOnlyDictionary<string, string> instanceTargetMap)
     {
         if (metadata is null)
         {
-            return Array.Empty<DependencyRelation>();
+            return CallRelationshipExtractor.ExtractCallRelations(metadata, instanceTargetMap)
+                .Select(relation => new DependencyRelation(relation.Target, "Calls", relation.MetadataKey))
+                .ToArray();
         }
 
-        return RelationshipByMetadataKey
+        var relations = RelationshipByMetadataKey
             .Where(entry => metadata.ContainsKey(entry.Key))
             .SelectMany(entry => SplitDependencies(metadata[entry.Key]).Select(target => new DependencyRelation(target, entry.Value, entry.Key)))
+            .ToList();
+
+        relations.AddRange(
+            CallRelationshipExtractor.ExtractCallRelations(metadata, instanceTargetMap)
+                .Select(relation => new DependencyRelation(relation.Target, "Calls", relation.MetadataKey)));
+
+        return relations
             .DistinctBy(relation => $"{relation.Target}|{relation.Relationship}", StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }

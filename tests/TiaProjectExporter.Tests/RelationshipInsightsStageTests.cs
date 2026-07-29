@@ -61,6 +61,49 @@ public sealed class RelationshipInsightsStageTests
         Assert.Contains(relationships, entry => entry.GetProperty("name").GetString() == "UsesTag");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_UsesXmlCallInfoForRelationshipEdges()
+    {
+        var writer = new RecordingArtifactWriter();
+        var context = new ExportExecutionContext(
+            ExportOptions.CreateDefault("out"),
+            writer,
+            NullLogger.Instance);
+
+        context.SetInventory(new TiaProjectInventory(
+            TiaInventoryStatus.Partial,
+            ProjectName: "Demo",
+            ProjectPath: "C:/Projects/Demo.ap19",
+            Objects:
+            [
+                new TiaProjectObjectNode("OB", "Main", "Project/PLC/Blocks/Main", 2, new Dictionary<string, string>
+                {
+                    ["Content.ExportXml"] = """
+                    <Document>
+                      <CallInfo Name="Block_1" BlockType="FB"><Component Name="Block_1_DB" /></CallInfo>
+                      <CallInfo Name="Block_2" BlockType="FB"><Component Name="Block_2_DB" /></CallInfo>
+                    </Document>
+                    """
+                }),
+                new TiaProjectObjectNode("FB", "Block_1", "Project/PLC/Blocks/Block_1", 2),
+                new TiaProjectObjectNode("FB", "Block_2", "Project/PLC/Blocks/Block_2", 2)
+            ],
+            Issues: Array.Empty<ExportIssue>()));
+
+        var stage = new RelationshipInsightsStage();
+
+        await stage.ExecuteAsync(context, CancellationToken.None);
+
+        var json = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Reports/RELATIONSHIP_INSIGHTS.json");
+        using var document = JsonDocument.Parse(json.Content);
+        var edgeCount = document.RootElement.GetProperty("summary").GetProperty("edgeCount").GetInt32();
+        Assert.True(edgeCount >= 2);
+
+        var topDependencies = document.RootElement.GetProperty("topDependencies").EnumerateArray().ToArray();
+        Assert.Contains(topDependencies, item => item.GetProperty("name").GetString() == "Block_1");
+        Assert.Contains(topDependencies, item => item.GetProperty("name").GetString() == "Block_2");
+    }
+
     private sealed class RecordingArtifactWriter : IExportArtifactWriter
     {
         public List<ExportArtifact> Artifacts { get; } = [];

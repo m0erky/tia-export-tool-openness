@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.46`
+- Current application version: `0.0.47`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -102,6 +102,8 @@ If build complains about SDK mismatch, install that SDK first.
 - Inventory canonicalization + deduplication: export now canonicalizes qualified paths (for example collapsing `DeviceItemImpl/DeviceItemImpl` and `BlockGroup/Blocks`) and deduplicates by `(ObjectType, CanonicalQualifiedPath)` before downstream analyses.
 - Conflict resolution for duplicates: dedup keeps the strongest object version using `typed extraction > host plc model > reflection`, then richer content (source/export XML).
 - Per-block exports: blocks are now exported additionally as single-object artifacts under `Export/Blocks/ByName` (JSON/Markdown, optional XML) with `INDEX.json` for direct engineering lookup.
+- Call relationship extraction hardening: call/dependency/relationship analysis now also parses `Content.ExportXml` (`<CallInfo ...>`) so OB network calls are detected even when `Calls` metadata is not present.
+- Instance target mapping: call targets referencing instance DB names are mapped via `InstanceOfName`/`InstanceOf`/`DataType` to FB targets for consistent graph edges.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 

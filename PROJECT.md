@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.46**
+Version baseline for this milestone: **0.0.47**
 
 Scope:
 
@@ -51,8 +51,8 @@ Scope:
 ## Current State Snapshot (2026-07-29)
 
 ### Version / Commit
-- Version: `0.0.46`
-- Last commit: `09dd331`
+- Version: `0.0.47`
+- Last commit: `02b6eab`
 - Branch: `main`
 
 ### Goal Right Now
@@ -70,10 +70,20 @@ Scope:
 - Full export now forwards selected domains into host traversal for domain-aware export scope reduction.
 
 ### Current critical issue
-- Duplicate logical PLC objects can still inflate downstream engineering views when canonicalization/deduplication is not consistently validated against real projects; regression checks are required on Windows exports.
+- Some projects expose valid OB call information only inside export XML (`<CallInfo ...>`). If not parsed, call/dependency/relationship artifacts can show zero edges despite real calls.
 - Deep export XML failures for inconsistent blocks/UDTs (Siemens-side project consistency state) remain a key source of partial content and need clear operator guidance.
 
 ### Recent technical changes (latest)
+- Added shared call-relationship extractor (`CallRelationshipExtractor`) for analysis stages:
+  - parses call targets from metadata (`Calls`, `BlockCalls`, `InvokedBlocks`, `CalledBlocks`)
+  - additionally parses `<CallInfo Name="...">` from `Content.ExportXml`
+  - extracts instance references from `<Component Name="...">` and emits mapped call relations.
+- Added instance DB target mapping (`InstanceOfName`/`InstanceOf`/`DataType`) so calls referencing instance DB names resolve to FB targets for graph/dependency consistency.
+- Updated `BlockCallGraphStage`, `DependencyGraphStage`, and `RelationshipInsightsStage` to use shared XML-backed call extraction.
+- Added tests for:
+  - OB export-XML call parsing (`Call edges: 2` scenario)
+  - instance DB target mapping to FB targets in dependencies
+  - relationship insights edge generation from XML call info.
 - Added centralized qualified-path canonicalization utility (`QualifiedPathCanonicalizer`) for stable path normalization across inventory processing.
 - Added centralized inventory deduplication utility (`TiaInventoryDeduplicator`) using key `(ObjectType, CanonicalQualifiedPath)` with conflict rule:
   - typed extraction > host plc model > reflection
@@ -125,8 +135,8 @@ Scope:
 - Keep bundle-first output structure for large projects.
 
 ### Next 3 steps (priority)
-1. Validate canonical dedup behavior on Windows real projects (V18/V19/V20):
-   - confirm logical single appearance for OB/FB/FC/DB despite variant runtime paths.
+1. Validate XML-backed call extraction on Windows real projects (V18/V19/V20):
+   - confirm OB `CallInfo` edges appear consistently in `BLOCK_CALL_GRAPH`, `DEPENDENCIES`, and `RELATIONSHIP_INSIGHTS`.
 2. Add operator-facing guidance for Siemens inconsistency export errors:
    - explicit remediation hints in reports/UI for "Inconsistent blocks and PLC data types (UDT) cannot be exported".
 3. Expand by-name block exports with optional cross-links to call/dependency insights for faster engineering reviews.
@@ -136,6 +146,7 @@ Scope:
 - [x] `dotnet build src/TiaProjectExporter.OpennessHost/TiaProjectExporter.OpennessHost.csproj -v minimal`
 - [x] Dedup unit tests cover canonicalization patterns + conflict-resolution priorities.
 - [x] Per-block export tests cover by-name artifacts + index generation.
+- [x] XML call parsing tests cover OB `<CallInfo>` extraction and instance mapping.
 - [ ] UI: `Scan Project Contents` shows non-zero Blocks for known project with FB/FC/DB.
 - [ ] UI: Export runs after scan with default selections.
 - [ ] UI: Single-domain export (for example only `Blocks`) does not traverse unrelated domains in host runtime logs.
@@ -443,6 +454,11 @@ Scope:
 - Extended export reporting with a `Deduplication Summary` section and dedup statistics payload in `PROJECT_STATISTICS.json`.
 - Added tests for path canonicalization, dedup conflict resolution, dedup stage integration, by-name file naming, and by-name index generation.
 - Incremented application version to `0.0.46` in central build metadata and UI fallback version resolution.
+- Added XML-backed call relationship extraction for analysis stages so `<CallInfo Name="...">` entries in block export XML contribute to calls/dependencies/insights even when runtime metadata keys are empty.
+- Added instance-DB target mapping (`InstanceOfName`/`InstanceOf`/`DataType`) so call targets referencing instance DB names resolve to FB targets.
+- Updated block call graph, dependency graph, and relationship insights stages to share the new call extraction logic for consistent edge counts.
+- Added tests for OB XML call parsing (`Block_1`, `Block_2`), instance mapping (`Block_1_DB -> Block_1`), and relationship insights edge generation from XML.
+- Incremented application version to `0.0.47` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

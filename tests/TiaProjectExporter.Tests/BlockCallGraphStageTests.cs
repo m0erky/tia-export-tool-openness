@@ -46,6 +46,46 @@ public sealed class BlockCallGraphStageTests
         Assert.Contains("ExternalBlock", graphArtifact.Content, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ExtractsCallsFromObExportXml_WhenMetadataCallsMissing()
+    {
+        var writer = new RecordingArtifactWriter();
+        var context = new ExportExecutionContext(
+            ExportOptions.CreateDefault("out"),
+            writer,
+            NullLogger.Instance);
+
+        context.SetInventory(new TiaProjectInventory(
+            TiaInventoryStatus.Partial,
+            ProjectName: "Demo",
+            ProjectPath: "C:/Projects/Demo.ap19",
+            Objects:
+            [
+                new TiaProjectObjectNode("OB", "Main", "Project/PLC/Blocks/Main", 2, new Dictionary<string, string>
+                {
+                    ["Content.ExportXml"] = """
+                    <Document>
+                      <CallInfo Name="Block_1" BlockType="FB"><Component Name="Block_1_DB" /></CallInfo>
+                      <CallInfo Name="Block_2" BlockType="FB"><Component Name="Block_2_DB" /></CallInfo>
+                    </Document>
+                    """
+                }),
+                new TiaProjectObjectNode("FB", "Block_1", "Project/PLC/Blocks/Block_1", 2),
+                new TiaProjectObjectNode("FB", "Block_2", "Project/PLC/Blocks/Block_2", 2)
+            ],
+            Issues: Array.Empty<ExportIssue>()));
+
+        var stage = new BlockCallGraphStage();
+
+        await stage.ExecuteAsync(context, CancellationToken.None);
+
+        var graphArtifact = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/BLOCK_CALL_GRAPH.md");
+        Assert.Contains("Call edges: **2**", graphArtifact.Content, StringComparison.Ordinal);
+        Assert.Contains("Main", graphArtifact.Content, StringComparison.Ordinal);
+        Assert.Contains("Block_1", graphArtifact.Content, StringComparison.Ordinal);
+        Assert.Contains("Block_2", graphArtifact.Content, StringComparison.Ordinal);
+    }
+
     private sealed class RecordingArtifactWriter : IExportArtifactWriter
     {
         public List<ExportArtifact> Artifacts { get; } = [];

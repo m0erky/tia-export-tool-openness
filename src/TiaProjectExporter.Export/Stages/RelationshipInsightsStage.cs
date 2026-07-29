@@ -70,9 +70,10 @@ public sealed class RelationshipInsightsStage : IExportStage
 
         var nodeIds = nodes.Select(node => node.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var nodeNames = nodes.Select(node => node.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var instanceTargetMap = CallRelationshipExtractor.BuildInstanceTargetMap(inventory);
 
         var edges = inventory.Objects
-            .SelectMany(source => ParseRelationships(source.Metadata).Select(relation => new GraphEdge(
+            .SelectMany(source => ParseRelationships(source.Metadata, instanceTargetMap).Select(relation => new GraphEdge(
                 SourceId: BuildNodeId(source),
                 SourceName: source.Name,
                 Target: relation.Target,
@@ -227,16 +228,27 @@ public sealed class RelationshipInsightsStage : IExportStage
         builder.AppendLine();
     }
 
-    private static IReadOnlyList<DependencyRelation> ParseRelationships(IReadOnlyDictionary<string, string>? metadata)
+    private static IReadOnlyList<DependencyRelation> ParseRelationships(
+        IReadOnlyDictionary<string, string>? metadata,
+        IReadOnlyDictionary<string, string> instanceTargetMap)
     {
         if (metadata is null)
         {
-            return Array.Empty<DependencyRelation>();
+            return CallRelationshipExtractor.ExtractCallRelations(metadata, instanceTargetMap)
+                .Select(relation => new DependencyRelation(relation.Target, "Calls", relation.MetadataKey))
+                .ToArray();
         }
 
-        return RelationshipByMetadataKey
+        var relations = RelationshipByMetadataKey
             .Where(entry => metadata.ContainsKey(entry.Key))
             .SelectMany(entry => SplitValues(metadata[entry.Key]).Select(target => new DependencyRelation(target, entry.Value, entry.Key)))
+            .ToList();
+
+        relations.AddRange(
+            CallRelationshipExtractor.ExtractCallRelations(metadata, instanceTargetMap)
+                .Select(relation => new DependencyRelation(relation.Target, "Calls", relation.MetadataKey)));
+
+        return relations
             .DistinctBy(relation => $"{relation.Target}|{relation.Relationship}", StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }

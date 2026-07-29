@@ -10,7 +10,6 @@ namespace TiaProjectExporter.Export.Stages;
 /// </summary>
 public sealed class BlockCallGraphStage : IExportStage
 {
-    private static readonly char[] DependencySeparators = [',', ';', '|'];
     /// <inheritdoc />
     public string Name => "Block Call Graph";
 
@@ -45,6 +44,8 @@ public sealed class BlockCallGraphStage : IExportStage
             return builder.ToString();
         }
 
+        var instanceTargetMap = CallRelationshipExtractor.BuildInstanceTargetMap(inventory);
+
         var blocks = inventory.Objects
             .Where(node => IsBlockNode(node.ObjectType))
             .Select(node => new BlockNode(
@@ -52,7 +53,7 @@ public sealed class BlockCallGraphStage : IExportStage
                 node.ObjectType,
                 node.QualifiedPath,
                 IsEntryPoint(node.Metadata, node.ObjectType),
-                ParseCalls(node.Metadata)))
+                ParseCalls(node.Metadata, instanceTargetMap)))
             .ToArray();
 
         var knownBlockNames = blocks
@@ -173,25 +174,14 @@ public sealed class BlockCallGraphStage : IExportStage
         || objectType.Contains("DB", StringComparison.OrdinalIgnoreCase)
         || objectType.Contains("Block", StringComparison.OrdinalIgnoreCase);
 
-    private static IReadOnlyList<string> ParseCalls(IReadOnlyDictionary<string, string>? metadata)
+    private static IReadOnlyList<string> ParseCalls(
+        IReadOnlyDictionary<string, string>? metadata,
+        IReadOnlyDictionary<string, string> instanceTargetMap)
     {
-        if (metadata is null)
-        {
-            return Array.Empty<string>();
-        }
-
-        var keys = new[] { "Calls", "BlockCalls", "InvokedBlocks", "CalledBlocks" };
-
-        return keys
-            .Where(metadata.ContainsKey)
-            .SelectMany(key => SplitValues(metadata[key]))
+        return CallRelationshipExtractor.ExtractCallRelations(metadata, instanceTargetMap)
+            .Select(relation => relation.Target)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-    }
-
-    private static IEnumerable<string> SplitValues(string raw)
-    {
-        return raw.Split(DependencySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static bool IsEntryPoint(IReadOnlyDictionary<string, string>? metadata, string objectType) =>
