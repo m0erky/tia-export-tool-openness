@@ -36,7 +36,7 @@ public sealed class InventoryObjectExportStage : IExportStage
 
         var jsonOptions = JsonOptionsFactory.CreateDefault();
         var exportedBundles = 0;
-        var exportedByNameBlocks = 0;
+        var byNameSummary = BlockByNameExportSummary.Empty;
 
         foreach (var group in grouped)
         {
@@ -90,25 +90,35 @@ public sealed class InventoryObjectExportStage : IExportStage
 
         if (blockNodes.Length > 0)
         {
-            exportedByNameBlocks = await WritePerBlockArtifactsAsync(context, blockNodes, cancellationToken).ConfigureAwait(false);
+            byNameSummary = await WritePerBlockArtifactsAsync(context, blockNodes, cancellationToken).ConfigureAwait(false);
         }
 
         context.AddResult(new ExportedObjectResult(
             "InventoryObjects",
             "Inventory Object Bundles",
             ExportObjectStatus.Succeeded,
-            $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles and {exportedByNameBlocks} per-block files"));
+            $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles and {byNameSummary.ExportedBlocks} per-block files"));
+
+        if (byNameSummary.ExportedBlocks > 0)
+        {
+            context.AddResult(new ExportedObjectResult(
+                "StructuredTextReconstruction",
+                "ByName Blocks",
+                ExportObjectStatus.Succeeded,
+                $"Blocks with exportXml: {byNameSummary.BlocksWithExportXml}; Success: {byNameSummary.Success}; NoStructuredText: {byNameSummary.NoStructuredText}; ParseError: {byNameSummary.ParseError}; UnsupportedPattern: {byNameSummary.UnsupportedPattern}"));
+        }
 
         await context.ReportProgressAsync(
-            new ExportProgressUpdate(Name, $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles and {exportedByNameBlocks} per-block files", inventory.Objects.Count, inventory.Objects.Count, TimeSpan.Zero)).ConfigureAwait(false);
+            new ExportProgressUpdate(Name, $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles and {byNameSummary.ExportedBlocks} per-block files", inventory.Objects.Count, inventory.Objects.Count, TimeSpan.Zero)).ConfigureAwait(false);
     }
 
-    private static async Task<int> WritePerBlockArtifactsAsync(
+    private static async Task<BlockByNameExportSummary> WritePerBlockArtifactsAsync(
         ExportExecutionContext context,
         IReadOnlyList<TiaProjectObjectNode> blockNodes,
         CancellationToken cancellationToken)
     {
         var index = new List<BlockByNameIndexEntry>(blockNodes.Count);
+        var reconstruction = new BlockByNameReconstructionCounter();
 
         var collisions = blockNodes
             .Select(node => BuildBlockFileBaseName(node))
@@ -142,6 +152,14 @@ public sealed class InventoryObjectExportStage : IExportStage
 
             var relativeBasePath = $"Export/Blocks/ByName/{finalName}";
 
+            StructuredTextReconstructionResult? reconstructionResult = null;
+            if (IsStructuredTextTargetBlock(node.ObjectType) && !string.IsNullOrWhiteSpace(exportXml))
+            {
+                reconstruction.BlocksWithExportXml++;
+                reconstructionResult = StructuredTextReconstructor.Reconstruct(exportXml);
+                reconstruction.Increment(reconstructionResult.ReconstructionStatus);
+            }
+
             var payload = new
             {
                 type = node.ObjectType,
@@ -151,7 +169,10 @@ public sealed class InventoryObjectExportStage : IExportStage
                 originalPaths = ParseOriginalPaths(originalPaths, node.QualifiedPath),
                 metadata = BuildCompactMetadata(metadata),
                 sourceText = string.IsNullOrWhiteSpace(sourceText) ? null : sourceText,
-                exportXml = string.IsNullOrWhiteSpace(exportXml) ? null : exportXml
+                exportXml = string.IsNullOrWhiteSpace(exportXml) ? null : exportXml,
+                reconstructedSourceText = reconstructionResult?.ReconstructedSourceText,
+                reconstructionStatus = reconstructionResult?.ReconstructionStatus,
+                reconstructionDiagnostics = reconstructionResult?.ReconstructionDiagnostics
             };
 
             var json = JsonSerializer.Serialize(payload, JsonOptionsFactory.CreateDefault());
@@ -177,8 +198,19 @@ public sealed class InventoryObjectExportStage : IExportStage
         var indexJson = JsonSerializer.Serialize(index, JsonOptionsFactory.CreateDefault());
         await context.WriteArtifactAsync(new ExportArtifact("Export/Blocks/ByName/INDEX.json", ExportFormat.Json, indexJson), cancellationToken).ConfigureAwait(false);
 
-        return blockNodes.Count;
+        return new BlockByNameExportSummary(
+            ExportedBlocks: blockNodes.Count,
+            BlocksWithExportXml: reconstruction.BlocksWithExportXml,
+            Success: reconstruction.Success,
+            NoStructuredText: reconstruction.NoStructuredText,
+            ParseError: reconstruction.ParseError,
+            UnsupportedPattern: reconstruction.UnsupportedPattern);
     }
+
+    private static bool IsStructuredTextTargetBlock(string objectType) =>
+        string.Equals(objectType, "FB", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(objectType, "FC", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(objectType, "OB", StringComparison.OrdinalIgnoreCase);
 
     private static string BuildBlockFileBaseName(TiaProjectObjectNode node)
     {
@@ -482,4 +514,54 @@ public sealed class InventoryObjectExportStage : IExportStage
         IReadOnlyDictionary<string, string> Metadata,
         string? ExportXmlContent,
         string? SourceTextContent);
+
+    private sealed record BlockByNameExportSummary(
+        int ExportedBlocks,
+        int BlocksWithExportXml,
+        int Success,
+        int NoStructuredText,
+        int ParseError,
+        int UnsupportedPattern)
+    {
+        public static BlockByNameExportSummary Empty { get; } = new(0, 0, 0, 0, 0, 0);
+    }
+
+    private sealed class BlockByNameReconstructionCounter
+    {
+        public int BlocksWithExportXml { get; set; }
+
+        public int Success { get; set; }
+
+        public int NoStructuredText { get; set; }
+
+        public int ParseError { get; set; }
+
+        public int UnsupportedPattern { get; set; }
+
+        public void Increment(string status)
+        {
+            if (string.Equals(status, "Success", StringComparison.OrdinalIgnoreCase))
+            {
+                Success++;
+                return;
+            }
+
+            if (string.Equals(status, "NoStructuredText", StringComparison.OrdinalIgnoreCase))
+            {
+                NoStructuredText++;
+                return;
+            }
+
+            if (string.Equals(status, "ParseError", StringComparison.OrdinalIgnoreCase))
+            {
+                ParseError++;
+                return;
+            }
+
+            if (string.Equals(status, "UnsupportedPattern", StringComparison.OrdinalIgnoreCase))
+            {
+                UnsupportedPattern++;
+            }
+        }
+    }
 }

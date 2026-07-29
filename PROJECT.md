@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.50**
+Version baseline for this milestone: **0.0.51**
 
 Scope:
 
@@ -51,7 +51,7 @@ Scope:
 ## Current State Snapshot (2026-07-29)
 
 ### Version / Commit
-- Version: `0.0.50`
+- Version: `0.0.51`
 - Last commit: `see git log --oneline`
 - Branch: `main`
 
@@ -74,6 +74,11 @@ Scope:
 - Deep export XML failures for inconsistent blocks/UDTs (Siemens-side project consistency state) remain a key source of partial content and need clear operator guidance.
 
 ### Recent technical changes (latest)
+- Added `StructuredTextReconstructor` for `FB/FC/OB` ByName export payloads to reconstruct readable code from `exportXml` (`StructuredText`) when raw `sourceText` is only comments/whitespace.
+- ByName JSON payloads now include `reconstructedSourceText`, `reconstructionStatus`, and `reconstructionDiagnostics` for `FB/FC/OB` blocks while keeping `sourceText`/`exportXml` unchanged.
+- `EXPORT_REPORT.md` now includes `StructuredText Reconstruction Summary` (blocks with `exportXml`, success, `NoStructuredText`, errors, success rate).
+- Added unit tests for structured-text reconstruction (IF/THEN/END_IF, access dot-path, entity decoding, missing structured text).
+- Added integration coverage asserting at least one FB ByName JSON contains `reconstructionStatus=Success` and non-empty `reconstructedSourceText`.
 - Safety login hardening: host now resolves multiple SafetyAdministration runtime type candidates plus derived safety-administration runtime types from loaded Siemens assemblies.
 - Safety retry diagnostics: protected-block XML retry path now captures detailed login diagnostics (`SafetyLoginDiagnostics`) and reports whether no service was found vs. login attempts failed.
 - Safety permission detection now also recognizes broader/localized permission-denied patterns (for example `permission denied`, `access denied`, `nicht zulässig`, `Zugriff verweigert`).
@@ -197,6 +202,10 @@ Scope:
 
 ## Completed Tasks
 
+- Implemented structured-text reconstruction for ByName `FB/FC/OB` exports and exposed reconstruction fields in per-block JSON artifacts.
+- Added `StructuredText Reconstruction Summary` section to export report output.
+- Added unit + integration tests for reconstruction behavior and ByName payload population.
+- Incremented application version to `0.0.51` in central build metadata and UI fallback version resolution.
 - Hardened host SafetyAdministration service-type resolution with fallback candidates and runtime-derived matching.
 - Improved safety retry diagnostics in deep XML export handling (node-level login diagnostics and clearer failure reporting).
 - Extended safety permission-denied detection with additional localized/wording variants.

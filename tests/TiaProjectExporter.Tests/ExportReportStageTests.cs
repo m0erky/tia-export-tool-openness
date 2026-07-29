@@ -64,6 +64,21 @@ public sealed class ExportReportStageTests
                     })));
         context.AddIssue(new ExportIssue("Inventory", "No project path configured"));
 
+        await context.WriteArtifactAsync(
+            new ExportArtifact(
+                "Export/Blocks/ByName/FB_FB100.json",
+                ExportFormat.Json,
+                """
+                {
+                  "type": "FB",
+                  "name": "FB100",
+                  "exportXml": "<Document><StructuredText /></Document>",
+                  "reconstructionStatus": "Success",
+                  "reconstructedSourceText": "IF Axis.Ready THEN\nEND_IF;"
+                }
+                """),
+            CancellationToken.None);
+
         var stage = new ExportReportStage();
 
         await stage.ExecuteAsync(context, CancellationToken.None);
@@ -81,6 +96,8 @@ public sealed class ExportReportStageTests
         Assert.Contains("Deduplication Summary", report.Content, StringComparison.Ordinal);
         Assert.Contains("Removed duplicates", report.Content, StringComparison.Ordinal);
         Assert.Contains("Reflection fallback objects", report.Content, StringComparison.Ordinal);
+        Assert.Contains("StructuredText Reconstruction Summary", report.Content, StringComparison.Ordinal);
+        Assert.Contains("Blöcke mit exportXml", report.Content, StringComparison.Ordinal);
         using var document = JsonDocument.Parse(statistics.Content);
         var totalsElement = document.RootElement.GetProperty("totals");
         Assert.Equal(1, totalsElement.GetProperty("issues").GetInt32());

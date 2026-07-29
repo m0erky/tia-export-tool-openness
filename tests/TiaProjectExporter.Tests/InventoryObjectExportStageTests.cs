@@ -2,6 +2,7 @@ using TiaProjectExporter.Application;
 using TiaProjectExporter.Application.Abstractions;
 using TiaProjectExporter.Core.Models;
 using TiaProjectExporter.Export.Stages;
+using System.Text.Json;
 
 namespace TiaProjectExporter.Tests;
 
@@ -38,8 +39,25 @@ public sealed class InventoryObjectExportStageTests
                         ["CanonicalQualifiedPath"] = "Project/Devices/PLC_1/Software/Blocks/FB100",
                         ["OriginalQualifiedPaths"] = "Project/Devices/PLC_1/Software/Blocks/FB100",
                         ["BlockNumber"] = "100",
-                        ["Content.ExportXml"] = "<FB />",
-                        ["Content.SourceText"] = "FUNCTION_BLOCK FB100"
+                        ["Content.ExportXml"] = """
+                                                <Document>
+                                                  <StructuredText>
+                                                    <Token Text="IF" />
+                                                    <Blank />
+                                                    <Access>
+                                                      <Symbol>
+                                                        <Component Name="Axis" />
+                                                        <Component Name="Ready" />
+                                                      </Symbol>
+                                                    </Access>
+                                                    <Blank />
+                                                    <Token Text="THEN" />
+                                                    <NewLine />
+                                                    <Token Text="END_IF;" />
+                                                  </StructuredText>
+                                                </Document>
+                                                """,
+                        ["Content.SourceText"] = "   //"
                     }),
                 new TiaProjectObjectNode(
                     ObjectType: "OB",
@@ -61,7 +79,7 @@ public sealed class InventoryObjectExportStageTests
         await stage.ExecuteAsync(context, CancellationToken.None);
 
         var blocksJson = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/Bundles/FB.json");
-        Assert.Contains("FUNCTION_BLOCK FB100", blocksJson.Content, StringComparison.Ordinal);
+        Assert.Contains("sourceTextContent", blocksJson.Content, StringComparison.Ordinal);
 
         var blocksMarkdown = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/Bundles/FB.md");
         Assert.Contains("```text", blocksMarkdown.Content, StringComparison.Ordinal);
@@ -72,6 +90,15 @@ public sealed class InventoryObjectExportStageTests
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FB_FB100.json");
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FB_FB100.md");
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/OB_Main_Startup.json");
+
+        var fbByNameJson = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FB_FB100.json");
+        using var byNameDocument = JsonDocument.Parse(fbByNameJson.Content);
+        var byNameRoot = byNameDocument.RootElement;
+        Assert.Equal("Success", byNameRoot.GetProperty("reconstructionStatus").GetString());
+        var reconstructedSource = byNameRoot.GetProperty("reconstructedSourceText").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(reconstructedSource));
+        Assert.Contains("IF Axis.Ready THEN", reconstructedSource!, StringComparison.Ordinal);
+
         var index = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/INDEX.json");
         Assert.Contains("FB_FB100.json", index.Content, StringComparison.Ordinal);
         Assert.Contains("OB_Main_Startup.json", index.Content, StringComparison.Ordinal);

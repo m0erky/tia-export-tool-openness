@@ -228,6 +228,7 @@ public sealed class ExportReportStage : IExportStage
     {
         var fallbackSummary = BuildFallbackSummary(context.Inventory);
         var deduplicationSummary = BuildDeduplicationSummary(context.Inventory);
+        var structuredTextSummary = BuildStructuredTextReconstructionSummary(report);
         var builder = new StringBuilder();
         builder.AppendLine("# Export Report");
         builder.AppendLine();
@@ -275,8 +276,58 @@ public sealed class ExportReportStage : IExportStage
         AppendDeduplicationSummary(builder, deduplicationSummary);
         builder.AppendLine();
         AppendFallbackHotspots(builder, fallbackSummary);
+        builder.AppendLine();
+        AppendStructuredTextReconstructionSummary(builder, structuredTextSummary);
 
         return builder.ToString();
+    }
+
+    private static StructuredTextReconstructionSummary BuildStructuredTextReconstructionSummary(ExportReport report)
+    {
+        var result = report.Results
+            .LastOrDefault(item =>
+                item.ObjectType.Equals("StructuredTextReconstruction", StringComparison.OrdinalIgnoreCase)
+                && item.Identifier.Equals("ByName Blocks", StringComparison.OrdinalIgnoreCase));
+
+        if (result is null || string.IsNullOrWhiteSpace(result.Message))
+        {
+            return new StructuredTextReconstructionSummary(0, 0, 0, 0, 0);
+        }
+
+        var message = result.Message;
+
+        return new StructuredTextReconstructionSummary(
+            BlocksWithExportXml: ExtractCount(message, "Blocks with exportXml:"),
+            Success: ExtractCount(message, "Success:"),
+            NoStructuredText: ExtractCount(message, "NoStructuredText:"),
+            ParseError: ExtractCount(message, "ParseError:"),
+            UnsupportedPattern: ExtractCount(message, "UnsupportedPattern:"));
+    }
+
+    private static int ExtractCount(string message, string label)
+    {
+        var start = message.IndexOf(label, StringComparison.OrdinalIgnoreCase);
+        if (start < 0)
+        {
+            return 0;
+        }
+
+        start += label.Length;
+        while (start < message.Length && char.IsWhiteSpace(message[start]))
+        {
+            start++;
+        }
+
+        var end = start;
+        while (end < message.Length && char.IsDigit(message[end]))
+        {
+            end++;
+        }
+
+        var candidate = message[start..end];
+        return int.TryParse(candidate, out var parsed)
+            ? parsed
+            : 0;
     }
 
     private static FallbackSummary BuildFallbackSummary(TiaProjectInventory? inventory)
@@ -391,6 +442,22 @@ public sealed class ExportReportStage : IExportStage
         }
     }
 
+    private static void AppendStructuredTextReconstructionSummary(StringBuilder builder, StructuredTextReconstructionSummary summary)
+    {
+        var errors = summary.ParseError + summary.UnsupportedPattern;
+        var successRate = summary.BlocksWithExportXml <= 0
+            ? 0
+            : (double)summary.Success / summary.BlocksWithExportXml * 100;
+
+        builder.AppendLine("## StructuredText Reconstruction Summary");
+        builder.AppendLine();
+        builder.AppendLine($"- Blöcke mit exportXml: **{summary.BlocksWithExportXml}**");
+        builder.AppendLine($"- Erfolgreich rekonstruiert: **{summary.Success}**");
+        builder.AppendLine($"- NoStructuredText: **{summary.NoStructuredText}**");
+        builder.AppendLine($"- Fehler (ParseError/UnsupportedPattern): **{errors}**");
+        builder.AppendLine($"- Erfolgsquote: **{successRate:F1}%**");
+    }
+
     private static bool TryReadBoolMetadata(IReadOnlyDictionary<string, string>? metadata, string key) =>
         metadata is not null
         && metadata.TryGetValue(key, out var raw)
@@ -488,4 +555,11 @@ public sealed class ExportReportStage : IExportStage
         string ObjectType,
         string ExamplePath,
         int Count);
+
+    private sealed record StructuredTextReconstructionSummary(
+        int BlocksWithExportXml,
+        int Success,
+        int NoStructuredText,
+        int ParseError,
+        int UnsupportedPattern);
 }
