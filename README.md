@@ -74,7 +74,7 @@ If build complains about SDK mismatch, install that SDK first.
 
 ## Versioning
 
-- Current application version: `0.0.45`
+- Current application version: `0.0.46`
 
 - `TiaProjectExporter.OpennessHost` treats `NU1603` as warning-only (not error) because Siemens transitive dependency lower-bound versions are not currently available on `nuget.org`; closest higher compatible versions are restored and warning visibility is retained.
 - Traversal hardening: host reflection walk now applies candidate-property filtering, per-node/per-enumerable limits, and slow-property diagnostics to reduce hangs on heavy runtime nodes during deep project export.
@@ -99,6 +99,9 @@ If build complains about SDK mismatch, install that SDK first.
 - Domain-aware full traversal: selected export domains are now forwarded into Openness host traversal (`--domains`) so single-domain exports avoid unnecessary whole-project traversal paths.
 - Preview PLC block hardening: preview now performs a bounded block-focused reflection fallback when primary PLC model traversal finds no blocks, improving FB/FC/DB/OB detection reliability in selection scans.
 - Preview diagnostics metadata: preview writes root-level counters (`PreviewDiagnostics.*`) for PLC entry points, block groups, discovered OB/FB/FC/DB counts, fallback activations, and preview limit hits.
+- Inventory canonicalization + deduplication: export now canonicalizes qualified paths (for example collapsing `DeviceItemImpl/DeviceItemImpl` and `BlockGroup/Blocks`) and deduplicates by `(ObjectType, CanonicalQualifiedPath)` before downstream analyses.
+- Conflict resolution for duplicates: dedup keeps the strongest object version using `typed extraction > host plc model > reflection`, then richer content (source/export XML).
+- Per-block exports: blocks are now exported additionally as single-object artifacts under `Export/Blocks/ByName` (JSON/Markdown, optional XML) with `INDEX.json` for direct engineering lookup.
 - Version is centrally defined in `Directory.Build.props` via `Version`, `AssemblyVersion`, and `FileVersion`.
 - The WPF UI shows the current version in the window title/header.
 
@@ -196,6 +199,8 @@ Inventory artifacts are written as domain/type bundles, for example:
 
 - `Hardware/Bundles/*.json|*.xml|*.md`
 - `Blocks/Bundles/*.json|*.xml|*.md`
+- `Blocks/ByName/*.json|*.md` (optional `*.xml` when XML format enabled)
+- `Blocks/ByName/INDEX.json`
 - `Tags/Bundles/*.json|*.xml|*.md`
 - `UDTs/Bundles/*.json|*.xml|*.md`
 - `HMI/Bundles/*.json|*.xml|*.md`

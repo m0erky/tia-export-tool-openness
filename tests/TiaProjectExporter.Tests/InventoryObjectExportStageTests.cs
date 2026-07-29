@@ -35,8 +35,23 @@ public sealed class InventoryObjectExportStageTests
                     Depth: 2,
                     Metadata: new Dictionary<string, string>
                     {
+                        ["CanonicalQualifiedPath"] = "Project/Devices/PLC_1/Software/Blocks/FB100",
+                        ["OriginalQualifiedPaths"] = "Project/Devices/PLC_1/Software/Blocks/FB100",
+                        ["BlockNumber"] = "100",
                         ["Content.ExportXml"] = "<FB />",
                         ["Content.SourceText"] = "FUNCTION_BLOCK FB100"
+                    }),
+                new TiaProjectObjectNode(
+                    ObjectType: "OB",
+                    Name: "Main/Startup",
+                    QualifiedPath: "Project/Devices/PLC_1/Software/Blocks/Main/Startup",
+                    Depth: 2,
+                    Metadata: new Dictionary<string, string>
+                    {
+                        ["CanonicalQualifiedPath"] = "Project/Devices/PLC_1/Software/Blocks/Main/Startup",
+                        ["OriginalQualifiedPaths"] = "Project/Devices/PLC_1/Software/Blocks/Main/Startup",
+                        ["BlockNumber"] = "1",
+                        ["Content.SourceText"] = "ORGANIZATION_BLOCK Main"
                     })
             ],
             Issues: Array.Empty<ExportIssue>()));
@@ -54,9 +69,17 @@ public sealed class InventoryObjectExportStageTests
 
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Hardware/Bundles/Device.json");
 
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FB_FB100.json");
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FB_FB100.md");
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/OB_Main_Startup.json");
+        var index = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/INDEX.json");
+        Assert.Contains("FB_FB100.json", index.Content, StringComparison.Ordinal);
+        Assert.Contains("OB_Main_Startup.json", index.Content, StringComparison.Ordinal);
+
         var result = Assert.Single(context.Results, item => item.ObjectType == "InventoryObjects");
         Assert.Equal(ExportObjectStatus.Succeeded, result.Status);
         Assert.Contains("bundles", result.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("per-block", result.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class RecordingArtifactWriter : IExportArtifactWriter

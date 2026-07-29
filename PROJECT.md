@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.45**
+Version baseline for this milestone: **0.0.46**
 
 Scope:
 
@@ -48,11 +48,11 @@ Scope:
 - Expand generated reports from placeholder repository files to real discovered content.
 - Prepare the pipeline for per-object exporters and resilient export reporting.
 
-## Current State Snapshot (2026-07-28)
+## Current State Snapshot (2026-07-29)
 
 ### Version / Commit
-- Version: `0.0.45`
-- Last commit: `4a3b98e`
+- Version: `0.0.46`
+- Last commit: `09dd331`
 - Branch: `main`
 
 ### Goal Right Now
@@ -70,10 +70,21 @@ Scope:
 - Full export now forwards selected domains into host traversal for domain-aware export scope reduction.
 
 ### Current critical issue
-- Domain-aware traversal filtering is now implemented, but still needs Windows real-project validation to quantify runtime/memory reduction and ensure no domain-specific under-export regressions.
-- Residual risk: domain mapping in host traversal scope is heuristic and should be cross-checked against real Siemens runtime type catalogs on V18/V19/V20.
+- Duplicate logical PLC objects can still inflate downstream engineering views when canonicalization/deduplication is not consistently validated against real projects; regression checks are required on Windows exports.
+- Deep export XML failures for inconsistent blocks/UDTs (Siemens-side project consistency state) remain a key source of partial content and need clear operator guidance.
 
 ### Recent technical changes (latest)
+- Added centralized qualified-path canonicalization utility (`QualifiedPathCanonicalizer`) for stable path normalization across inventory processing.
+- Added centralized inventory deduplication utility (`TiaInventoryDeduplicator`) using key `(ObjectType, CanonicalQualifiedPath)` with conflict rule:
+  - typed extraction > host plc model > reflection
+  - then richer content (`Content.ExportXml`/`Content.SourceText`).
+- Integrated deduplication directly into `ProjectInventoryStage` before downstream stages, so call graph/dependency/tag usage/readiness/coverage all run on deduplicated canonical inventory.
+- Added per-block single-object export artifacts (backward-compatible add-on):
+  - `Export/Blocks/ByName/<Type>_<Name>.json`
+  - `Export/Blocks/ByName/<Type>_<Name>.md`
+  - optional XML when XML format enabled
+  - `Export/Blocks/ByName/INDEX.json` with type/name/number/file/canonicalPath.
+- Extended export reporting with explicit deduplication summary sections (input, removed duplicates, unique objects, top duplicate groups, conflict rule).
 - Added end-to-end domain-aware traversal forwarding for full exports:
   - UI-selected `IncludedDomains` now flow through inventory provider and openness adapter into host CLI argument `--domains`.
   - host parses and applies traversal scope restrictions before expensive traversal branches.
@@ -114,15 +125,17 @@ Scope:
 - Keep bundle-first output structure for large projects.
 
 ### Next 3 steps (priority)
-1. Validate domain-aware traversal on Windows real projects (V18/V19/V20):
-   - compare runtime duration/memory between single-domain and all-domain exports.
-2. Promote preview + traversal-scope diagnostics into user-visible runtime logs:
-   - explicit per-run summary of selected domains, applied scope, and preview counters.
-3. Expand tests for host argument composition and domain-scope application edge cases (`Udts`, `Hmi`, `Diagnostics`, mixed selections).
+1. Validate canonical dedup behavior on Windows real projects (V18/V19/V20):
+   - confirm logical single appearance for OB/FB/FC/DB despite variant runtime paths.
+2. Add operator-facing guidance for Siemens inconsistency export errors:
+   - explicit remediation hints in reports/UI for "Inconsistent blocks and PLC data types (UDT) cannot be exported".
+3. Expand by-name block exports with optional cross-links to call/dependency insights for faster engineering reviews.
 
 ### Validation checklist
 - [x] `dotnet test tests/TiaProjectExporter.Tests/TiaProjectExporter.Tests.csproj --no-restore -v minimal`
 - [x] `dotnet build src/TiaProjectExporter.OpennessHost/TiaProjectExporter.OpennessHost.csproj -v minimal`
+- [x] Dedup unit tests cover canonicalization patterns + conflict-resolution priorities.
+- [x] Per-block export tests cover by-name artifacts + index generation.
 - [ ] UI: `Scan Project Contents` shows non-zero Blocks for known project with FB/FC/DB.
 - [ ] UI: Export runs after scan with default selections.
 - [ ] UI: Single-domain export (for example only `Blocks`) does not traverse unrelated domains in host runtime logs.
@@ -423,6 +436,13 @@ Scope:
 - Added host-side domain scope parsing and traversal gating so PLC-only selections skip unrelated generic software traversal paths.
 - Extended inventory-provider tests to assert selected domain forwarding behavior for full traversal calls.
 - Incremented application version to `0.0.45` in central build metadata and UI fallback version resolution.
+- Added centralized qualified-path canonicalization (`QualifiedPathCanonicalizer`) and inventory deduplication (`TiaInventoryDeduplicator`) with stable `(ObjectType, CanonicalQualifiedPath)` keys.
+- Added documented dedup conflict strategy (`typed > host plc model > reflection`, then richer content) and propagated dedup metadata (`CanonicalQualifiedPath`, `OriginalQualifiedPaths`) to retained nodes.
+- Integrated deduplication into `ProjectInventoryStage` so all downstream analysis/report stages use canonical deduplicated data.
+- Added per-block by-name exports under `Export/Blocks/ByName` with JSON/Markdown (+ optional XML) and `INDEX.json` for direct engineering lookup.
+- Extended export reporting with a `Deduplication Summary` section and dedup statistics payload in `PROJECT_STATISTICS.json`.
+- Added tests for path canonicalization, dedup conflict resolution, dedup stage integration, by-name file naming, and by-name index generation.
+- Incremented application version to `0.0.46` in central build metadata and UI fallback version resolution.
 
 ## Known Issues
 

@@ -8,5 +8,5 @@ public sealed record TiaProjectInventory(
     string? ProjectName,
     string? ProjectPath,
     IReadOnlyList<TiaProjectObjectNode> Objects,
-    IReadOnlyList<ExportIssue> Issues);
-
+    IReadOnlyList<ExportIssue> Issues,
+    InventoryDeduplicationSummary? DeduplicationSummary = null);

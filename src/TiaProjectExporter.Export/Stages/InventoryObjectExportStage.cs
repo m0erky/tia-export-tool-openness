@@ -36,6 +36,7 @@ public sealed class InventoryObjectExportStage : IExportStage
 
         var jsonOptions = JsonOptionsFactory.CreateDefault();
         var exportedBundles = 0;
+        var exportedByNameBlocks = 0;
 
         foreach (var group in grouped)
         {
@@ -82,14 +83,209 @@ public sealed class InventoryObjectExportStage : IExportStage
             exportedBundles++;
         }
 
+        var blockNodes = inventory.Objects
+            .Where(node => IsDomainIncluded(context.Options, node))
+            .Where(node => TiaInventoryDomainClassifier.ResolveDomain(node) == ExportDomain.Blocks)
+            .ToArray();
+
+        if (blockNodes.Length > 0)
+        {
+            exportedByNameBlocks = await WritePerBlockArtifactsAsync(context, blockNodes, cancellationToken).ConfigureAwait(false);
+        }
+
         context.AddResult(new ExportedObjectResult(
             "InventoryObjects",
             "Inventory Object Bundles",
             ExportObjectStatus.Succeeded,
-            $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles"));
+            $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles and {exportedByNameBlocks} per-block files"));
 
         await context.ReportProgressAsync(
-            new ExportProgressUpdate(Name, $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles", inventory.Objects.Count, inventory.Objects.Count, TimeSpan.Zero)).ConfigureAwait(false);
+            new ExportProgressUpdate(Name, $"Exported {inventory.Objects.Count} objects into {exportedBundles} bundles and {exportedByNameBlocks} per-block files", inventory.Objects.Count, inventory.Objects.Count, TimeSpan.Zero)).ConfigureAwait(false);
+    }
+
+    private static async Task<int> WritePerBlockArtifactsAsync(
+        ExportExecutionContext context,
+        IReadOnlyList<TiaProjectObjectNode> blockNodes,
+        CancellationToken cancellationToken)
+    {
+        var index = new List<BlockByNameIndexEntry>(blockNodes.Count);
+
+        var collisions = blockNodes
+            .Select(node => BuildBlockFileBaseName(node))
+            .GroupBy(baseName => baseName, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+        var sequenceByBaseName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var node in blockNodes.OrderBy(entry => entry.QualifiedPath, StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var metadata = node.Metadata ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            metadata.TryGetValue("Content.ExportXml", out var exportXml);
+            metadata.TryGetValue("Content.SourceText", out var sourceText);
+            metadata.TryGetValue("CanonicalQualifiedPath", out var canonicalPath);
+            metadata.TryGetValue("OriginalQualifiedPaths", out var originalPaths);
+            metadata.TryGetValue("BlockNumber", out var blockNumber);
+
+            var baseName = BuildBlockFileBaseName(node);
+            var finalName = baseName;
+
+            if (collisions.ContainsKey(baseName))
+            {
+                sequenceByBaseName.TryGetValue(baseName, out var current);
+                current++;
+                sequenceByBaseName[baseName] = current;
+                finalName = $"{baseName}_{current}";
+            }
+
+            var relativeBasePath = $"Export/Blocks/ByName/{finalName}";
+
+            var payload = new
+            {
+                type = node.ObjectType,
+                name = node.Name,
+                number = string.IsNullOrWhiteSpace(blockNumber) ? null : blockNumber,
+                canonicalPath = string.IsNullOrWhiteSpace(canonicalPath) ? node.QualifiedPath : canonicalPath,
+                originalPaths = ParseOriginalPaths(originalPaths, node.QualifiedPath),
+                metadata = BuildCompactMetadata(metadata),
+                sourceText = string.IsNullOrWhiteSpace(sourceText) ? null : sourceText,
+                exportXml = string.IsNullOrWhiteSpace(exportXml) ? null : exportXml
+            };
+
+            var json = JsonSerializer.Serialize(payload, JsonOptionsFactory.CreateDefault());
+            await context.WriteArtifactAsync(new ExportArtifact($"{relativeBasePath}.json", ExportFormat.Json, json), cancellationToken).ConfigureAwait(false);
+
+            var markdown = BuildPerBlockMarkdown(payload.type, payload.name, payload.number, payload.canonicalPath, payload.originalPaths, payload.metadata, payload.sourceText, payload.exportXml);
+            await context.WriteArtifactAsync(new ExportArtifact($"{relativeBasePath}.md", ExportFormat.Markdown, markdown), cancellationToken).ConfigureAwait(false);
+
+            if (context.Options.Formats.Contains(ExportFormat.Xml))
+            {
+                var xml = BuildPerBlockXml(payload.type, payload.name, payload.number, payload.canonicalPath, payload.originalPaths, payload.metadata, payload.sourceText, payload.exportXml);
+                await context.WriteArtifactAsync(new ExportArtifact($"{relativeBasePath}.xml", ExportFormat.Xml, xml), cancellationToken).ConfigureAwait(false);
+            }
+
+            index.Add(new BlockByNameIndexEntry(
+                payload.type,
+                payload.name,
+                payload.number,
+                $"{finalName}.json",
+                payload.canonicalPath));
+        }
+
+        var indexJson = JsonSerializer.Serialize(index, JsonOptionsFactory.CreateDefault());
+        await context.WriteArtifactAsync(new ExportArtifact("Export/Blocks/ByName/INDEX.json", ExportFormat.Json, indexJson), cancellationToken).ConfigureAwait(false);
+
+        return blockNodes.Count;
+    }
+
+    private static string BuildBlockFileBaseName(TiaProjectObjectNode node)
+    {
+        var normalizedType = SanitizePathSegment(NormalizeObjectType(node.ObjectType));
+        var normalizedName = SanitizePathSegment(string.IsNullOrWhiteSpace(node.Name) ? "Unnamed" : node.Name);
+        return $"{normalizedType}_{normalizedName}";
+    }
+
+    private static IReadOnlyList<string> ParseOriginalPaths(string? rawPaths, string fallbackPath)
+    {
+        if (string.IsNullOrWhiteSpace(rawPaths))
+        {
+            return new[] { fallbackPath };
+        }
+
+        return rawPaths
+            .Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(path => path.Trim())
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string BuildPerBlockMarkdown(
+        string objectType,
+        string name,
+        string? number,
+        string canonicalPath,
+        IReadOnlyList<string> originalPaths,
+        IReadOnlyDictionary<string, string> metadata,
+        string? sourceText,
+        string? exportXml)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"# {objectType} {name}");
+        builder.AppendLine();
+        builder.AppendLine($"- Type: **{objectType}**");
+        builder.AppendLine($"- Name: **{name}**");
+        builder.AppendLine($"- Number: **{number ?? "n/a"}**");
+        builder.AppendLine($"- Canonical path: `{canonicalPath}`");
+        builder.AppendLine();
+        builder.AppendLine("## Original Paths");
+        builder.AppendLine();
+
+        foreach (var path in originalPaths)
+        {
+            builder.AppendLine($"- `{path}`");
+        }
+
+        if (metadata.Count > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine("## Metadata");
+            builder.AppendLine();
+
+            foreach (var pair in metadata.OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                builder.AppendLine($"- {pair.Key}: `{pair.Value}`");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(sourceText))
+        {
+            builder.AppendLine();
+            builder.AppendLine("## Source Text");
+            builder.AppendLine();
+            builder.AppendLine("```text");
+            builder.AppendLine(sourceText);
+            builder.AppendLine("```");
+        }
+
+        if (!string.IsNullOrWhiteSpace(exportXml))
+        {
+            builder.AppendLine();
+            builder.AppendLine("## Export XML");
+            builder.AppendLine();
+            builder.AppendLine("```xml");
+            builder.AppendLine(exportXml);
+            builder.AppendLine("```");
+        }
+
+        return builder.ToString();
+    }
+
+    private static string BuildPerBlockXml(
+        string objectType,
+        string name,
+        string? number,
+        string canonicalPath,
+        IReadOnlyList<string> originalPaths,
+        IReadOnlyDictionary<string, string> metadata,
+        string? sourceText,
+        string? exportXml)
+    {
+        var document = new XDocument(
+            new XElement(
+                "BlockExport",
+                new XAttribute("type", objectType),
+                new XAttribute("name", name),
+                new XAttribute("number", number ?? string.Empty),
+                new XElement("CanonicalPath", canonicalPath),
+                new XElement("OriginalPaths", originalPaths.Select(path => new XElement("Path", path))),
+                new XElement("Metadata", metadata.Select(pair => new XElement("Entry", new XAttribute("key", pair.Key), pair.Value))),
+                string.IsNullOrWhiteSpace(sourceText) ? null : new XElement("SourceText", new XCData(sourceText)),
+                string.IsNullOrWhiteSpace(exportXml) ? null : new XElement("ExportXml", new XCData(exportXml))));
+
+        return document.ToString();
     }
 
     private static BundleEntry BuildBundleEntry(TiaProjectObjectNode node)
@@ -271,6 +467,13 @@ public sealed class InventoryObjectExportStage : IExportStage
     }
 
     private readonly record struct BundleKey(string Domain, string ObjectType);
+
+    private sealed record BlockByNameIndexEntry(
+        string Type,
+        string Name,
+        string? Number,
+        string File,
+        string CanonicalPath);
 
     private sealed record BundleEntry(
         string Name,

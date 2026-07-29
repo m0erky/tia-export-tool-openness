@@ -62,8 +62,48 @@ public sealed class ProjectInventoryStageTests
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("TIA_PROJECT_INVENTORY.md", StringComparison.Ordinal));
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("AI_PROJECT_SUMMARY.md", StringComparison.Ordinal));
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath.EndsWith("AI_HARDWARE_SUMMARY.md", StringComparison.Ordinal));
-        Assert.Single(report.Issues);
+        Assert.Equal(2, report.Issues.Count);
+        Assert.Contains(report.Issues, issue => issue.Scope == "InventoryDeduplication");
         Assert.Equal(1, report.FailedCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DeduplicatesInventoryBeforeStoringInContext()
+    {
+        var writer = new RecordingArtifactWriter();
+        var context = new ExportExecutionContext(
+            ExportOptions.CreateDefault("out"),
+            writer,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+
+        var inventory = new TiaProjectInventory(
+            TiaInventoryStatus.Complete,
+            ProjectName: "Sample",
+            ProjectPath: "C:/Sample.ap20",
+            Objects: new[]
+            {
+                new TiaProjectObjectNode("OB", "Main", "Project/DeviceItemImpl/DeviceItemImpl/BlockGroup/Blocks/Main", 2,
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["ExtractionStrategy"] = "HostReflection"
+                    }),
+                new TiaProjectObjectNode("OB", "Main", "Project/DeviceItemImpl/BlockGroup/Main", 2,
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["ExtractedByTypedExtractor"] = "true"
+                    })
+            },
+            Issues: Array.Empty<ExportIssue>());
+
+        var stage = new ProjectInventoryStage(new StubInventoryProvider(inventory));
+
+        await stage.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.NotNull(context.Inventory);
+        Assert.Single(context.Inventory!.Objects);
+        Assert.Equal("Project/DeviceItemImpl/BlockGroup/Main", context.Inventory.Objects[0].QualifiedPath);
+        Assert.NotNull(context.Inventory.DeduplicationSummary);
+        Assert.Equal(1, context.Inventory.DeduplicationSummary!.RemovedDuplicates);
     }
 
     private sealed class StubInventoryProvider : ITiaProjectInventoryProvider

@@ -53,7 +53,15 @@ public sealed class ExportReportStageTests
                             ["ExtractedByTypedExtractor"] = "true"
                         })
                 },
-                Array.Empty<ExportIssue>()));
+                Array.Empty<ExportIssue>(),
+                new InventoryDeduplicationSummary(
+                    InputObjects: 5,
+                    RemovedDuplicates: 2,
+                    UniqueObjects: 3,
+                    TopDuplicateGroups: new[]
+                    {
+                        new InventoryDuplicateGroup("OB", "Project/BlockGroup/Main", 3)
+                    })));
         context.AddIssue(new ExportIssue("Inventory", "No project path configured"));
 
         var stage = new ExportReportStage();
@@ -70,11 +78,14 @@ public sealed class ExportReportStageTests
         Assert.Contains("Packaging", report.Content, StringComparison.Ordinal);
         Assert.Contains("Archive SHA-256", report.Content, StringComparison.Ordinal);
         Assert.Contains("Inventory", report.Content, StringComparison.Ordinal);
+        Assert.Contains("Deduplication Summary", report.Content, StringComparison.Ordinal);
+        Assert.Contains("Removed duplicates", report.Content, StringComparison.Ordinal);
         Assert.Contains("Reflection fallback objects", report.Content, StringComparison.Ordinal);
         using var document = JsonDocument.Parse(statistics.Content);
         var totalsElement = document.RootElement.GetProperty("totals");
         Assert.Equal(1, totalsElement.GetProperty("issues").GetInt32());
         Assert.True(document.RootElement.TryGetProperty("archive", out _));
+        Assert.Equal(2, document.RootElement.GetProperty("deduplication").GetProperty("removedDuplicates").GetInt32());
         Assert.Equal(1, document.RootElement.GetProperty("fallbackExtraction").GetProperty("totalFallbackObjects").GetInt32());
     }
 

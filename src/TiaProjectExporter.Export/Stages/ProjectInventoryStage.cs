@@ -39,6 +39,7 @@ public sealed class ProjectInventoryStage : IExportStage
                 .ConfigureAwait(false);
 
         inventory = ApplyDomainFilter(inventory, context.Options.IncludedDomains);
+        inventory = ApplyDeduplication(inventory);
         context.SetInventory(inventory);
         var jsonOptions = JsonOptionsFactory.CreateDefault();
 
@@ -85,8 +86,35 @@ public sealed class ProjectInventoryStage : IExportStage
         };
 
         context.AddResult(new ExportedObjectResult("Inventory", inventory.ProjectName ?? "TIA project", status, inventory.Status.ToString()));
+        if (inventory.DeduplicationSummary is not null)
+        {
+            context.AddResult(new ExportedObjectResult(
+                "InventoryDedup",
+                "Canonicalization",
+                ExportObjectStatus.Succeeded,
+                $"Input: {inventory.DeduplicationSummary.InputObjects}, Removed duplicates: {inventory.DeduplicationSummary.RemovedDuplicates}, Unique: {inventory.DeduplicationSummary.UniqueObjects} (Rule: typed>host-plc-model>reflection, then richer content)"));
+        }
+
         await context.ReportProgressAsync(
             new ExportProgressUpdate(Name, inventory.ProjectName ?? "Inventory exported", inventory.Objects.Count, inventory.Objects.Count, TimeSpan.Zero)).ConfigureAwait(false);
+    }
+
+    private static TiaProjectInventory ApplyDeduplication(TiaProjectInventory inventory)
+    {
+        var deduplication = TiaInventoryDeduplicator.Deduplicate(inventory.Objects);
+
+        var dedupIssue = new ExportIssue(
+            "InventoryDeduplication",
+            "Inventory canonicalized and deduplicated before downstream export/analysis.",
+            $"Input objects: {deduplication.Summary.InputObjects}; Removed duplicates: {deduplication.Summary.RemovedDuplicates}; Unique objects: {deduplication.Summary.UniqueObjects}; Conflict rule: typed extraction > host plc model > reflection; then richer content.");
+
+        return new TiaProjectInventory(
+            inventory.Status,
+            inventory.ProjectName,
+            inventory.ProjectPath,
+            deduplication.Objects,
+            inventory.Issues.Concat([dedupIssue]).ToArray(),
+            deduplication.Summary);
     }
 
     private static TiaProjectInventory ApplyDomainFilter(TiaProjectInventory inventory, IReadOnlyCollection<ExportDomain>? includedDomains)

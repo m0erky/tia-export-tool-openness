@@ -56,6 +56,7 @@ public sealed class ExportReportStage : IExportStage
     {
         var jsonOptions = JsonOptionsFactory.CreateDefault();
         var fallbackSummary = BuildFallbackSummary(context.Inventory);
+        var deduplicationSummary = BuildDeduplicationSummary(context.Inventory);
         var objectTypeCounts = report.Results
             .GroupBy(result => result.ObjectType)
             .OrderBy(group => group.Key, StringComparer.Ordinal)
@@ -89,6 +90,7 @@ public sealed class ExportReportStage : IExportStage
             },
             ObjectTypes = objectTypeCounts,
             Archive = BuildArchiveSection(context, report),
+            Deduplication = deduplicationSummary,
             FallbackExtraction = new
             {
                 fallbackSummary.TotalObjects,
@@ -105,6 +107,7 @@ public sealed class ExportReportStage : IExportStage
     private static string BuildProjectOverviewMarkdown(ExportExecutionContext context, ExportReport report, TimeSpan duration)
     {
         var fallbackSummary = BuildFallbackSummary(context.Inventory);
+        var deduplicationSummary = BuildDeduplicationSummary(context.Inventory);
         var builder = new StringBuilder();
         builder.AppendLine("# Project Overview");
         builder.AppendLine();
@@ -118,6 +121,7 @@ public sealed class ExportReportStage : IExportStage
         builder.AppendLine();
 
         AppendAnalysisHub(builder, context);
+        AppendDeduplicationSummary(builder, deduplicationSummary);
         AppendFallbackHotspots(builder, fallbackSummary);
 
         var failedOrSkipped = report.Results
@@ -223,6 +227,7 @@ public sealed class ExportReportStage : IExportStage
         DateTimeOffset generatedAt)
     {
         var fallbackSummary = BuildFallbackSummary(context.Inventory);
+        var deduplicationSummary = BuildDeduplicationSummary(context.Inventory);
         var builder = new StringBuilder();
         builder.AppendLine("# Export Report");
         builder.AppendLine();
@@ -266,6 +271,8 @@ public sealed class ExportReportStage : IExportStage
             }
         }
 
+        builder.AppendLine();
+        AppendDeduplicationSummary(builder, deduplicationSummary);
         builder.AppendLine();
         AppendFallbackHotspots(builder, fallbackSummary);
 
@@ -311,6 +318,55 @@ public sealed class ExportReportStage : IExportStage
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count(),
             Hotspots: hotspots);
+    }
+
+    private static DeduplicationSummary BuildDeduplicationSummary(TiaProjectInventory? inventory)
+    {
+        var summary = inventory?.DeduplicationSummary;
+
+        if (summary is null)
+        {
+            var objectCount = inventory?.Objects.Count ?? 0;
+            return new DeduplicationSummary(
+                InputObjects: objectCount,
+                RemovedDuplicates: 0,
+                ResultingUniqueObjects: objectCount,
+                ConflictRule: "typed extraction > host plc model > reflection; then richer content",
+                TopDuplicateGroups: Array.Empty<InventoryDuplicateGroup>());
+        }
+
+        return new DeduplicationSummary(
+            InputObjects: summary.InputObjects,
+            RemovedDuplicates: summary.RemovedDuplicates,
+            ResultingUniqueObjects: summary.UniqueObjects,
+            ConflictRule: "typed extraction > host plc model > reflection; then richer content",
+            TopDuplicateGroups: summary.TopDuplicateGroups);
+    }
+
+    private static void AppendDeduplicationSummary(StringBuilder builder, DeduplicationSummary summary)
+    {
+        builder.AppendLine("## Deduplication Summary");
+        builder.AppendLine();
+        builder.AppendLine($"- Input objects: **{summary.InputObjects}**");
+        builder.AppendLine($"- Removed duplicates: **{summary.RemovedDuplicates}**");
+        builder.AppendLine($"- Resulting unique objects: **{summary.ResultingUniqueObjects}**");
+        builder.AppendLine($"- Conflict rule: `{summary.ConflictRule}`");
+        builder.AppendLine($"- Data basis: **deduplicated canonical inventory**");
+        builder.AppendLine();
+
+        if (summary.TopDuplicateGroups.Count == 0)
+        {
+            builder.AppendLine("No duplicate groups were detected after canonicalization.");
+            return;
+        }
+
+        builder.AppendLine("### Top duplicate groups");
+        builder.AppendLine();
+
+        foreach (var group in summary.TopDuplicateGroups)
+        {
+            builder.AppendLine($"- {group.ObjectType}: `{group.CanonicalQualifiedPath}` (**{group.Count}**) ");
+        }
     }
 
     private static void AppendFallbackHotspots(StringBuilder builder, FallbackSummary summary)
@@ -418,6 +474,13 @@ public sealed class ExportReportStage : IExportStage
         int TotalTypedObjects,
         int TotalUniqueFallbackRuntimeTypes,
         IReadOnlyList<FallbackHotspotItem> Hotspots);
+
+    private sealed record DeduplicationSummary(
+        int InputObjects,
+        int RemovedDuplicates,
+        int ResultingUniqueObjects,
+        string ConflictRule,
+        IReadOnlyList<InventoryDuplicateGroup> TopDuplicateGroups);
 
     private sealed record FallbackHotspotItem(
         string Domain,
