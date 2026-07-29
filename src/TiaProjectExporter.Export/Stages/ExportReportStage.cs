@@ -291,7 +291,7 @@ public sealed class ExportReportStage : IExportStage
 
         if (result is null || string.IsNullOrWhiteSpace(result.Message))
         {
-            return new StructuredTextReconstructionSummary(0, 0, 0, 0, 0);
+            return new StructuredTextReconstructionSummary(0, 0, 0, 0, 0, 0, 0, 0, 0);
         }
 
         var message = result.Message;
@@ -301,7 +301,11 @@ public sealed class ExportReportStage : IExportStage
             Success: ExtractCount(message, "Success:"),
             NoStructuredText: ExtractCount(message, "NoStructuredText:"),
             ParseError: ExtractCount(message, "ParseError:"),
-            UnsupportedPattern: ExtractCount(message, "UnsupportedPattern:"));
+            UnsupportedPattern: ExtractCount(message, "UnsupportedPattern:"),
+            AwlEligible: ExtractCount(message, "AWLEligible:"),
+            AwlSuccess: ExtractCount(message, "AWLSuccess:"),
+            AwlFailure: ExtractCount(message, "AWLFailure:"),
+            AwlNoSource: ExtractCount(message, "AWLNoSource:"));
     }
 
     private static int ExtractCount(string message, string label)
@@ -456,6 +460,16 @@ public sealed class ExportReportStage : IExportStage
         builder.AppendLine($"- NoStructuredText: **{summary.NoStructuredText}**");
         builder.AppendLine($"- Fehler (ParseError/UnsupportedPattern): **{errors}**");
         builder.AppendLine($"- Erfolgsquote: **{successRate:F1}%**");
+
+        if (summary.AwlEligible > 0)
+        {
+            var awlRate = (double)summary.AwlSuccess / summary.AwlEligible * 100;
+            builder.AppendLine($"- AWL eligible: **{summary.AwlEligible}**");
+            builder.AppendLine($"- AWL success: **{summary.AwlSuccess}**");
+            builder.AppendLine($"- AWL fail: **{summary.AwlFailure}**");
+            builder.AppendLine($"- AWL no source: **{summary.AwlNoSource}**");
+            builder.AppendLine($"- AWL Erfolgsquote: **{awlRate:F1}%**");
+        }
     }
 
     private static bool TryReadBoolMetadata(IReadOnlyDictionary<string, string>? metadata, string key) =>
@@ -561,5 +575,9 @@ public sealed class ExportReportStage : IExportStage
         int Success,
         int NoStructuredText,
         int ParseError,
-        int UnsupportedPattern);
+        int UnsupportedPattern,
+        int AwlEligible,
+        int AwlSuccess,
+        int AwlFailure,
+        int AwlNoSource);
 }

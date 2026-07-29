@@ -87,4 +87,76 @@ public sealed class StructuredTextReconstructorTests
         Assert.Equal("ParseError", result.ReconstructionStatus);
         Assert.Null(result.ReconstructedSourceText);
     }
+
+    [Fact]
+    public void Reconstruct_AwlInstructions_AreReconstructedInOrder()
+    {
+        var xml = """
+                  <Root>
+                    <StructuredText>
+                      <Token Text="L" />
+                      <Blank />
+                      <ConstantValue>5</ConstantValue>
+                      <NewLine />
+                      <Token Text="T" />
+                      <Blank />
+                      <Access>
+                        <Symbol>
+                          <Component Name="DB1" />
+                          <Component Name="TargetValue" />
+                        </Symbol>
+                      </Access>
+                    </StructuredText>
+                  </Root>
+                  """;
+
+        var result = StructuredTextReconstructor.Reconstruct(xml, "AWL");
+
+        Assert.Equal("Success", result.ReconstructionStatus);
+        Assert.Equal("L 5\nT DB1.TargetValue", result.ReconstructedSourceText);
+    }
+
+    [Fact]
+    public void Reconstruct_AwlAccessSymbolPath_IsResolvedAsDotPath()
+    {
+        var xml = """
+                  <Root>
+                    <StructuredText>
+                      <Token Text="U" />
+                      <Blank />
+                      <Access>
+                        <Symbol>
+                          <Component Name="MyDb" />
+                          <Component Name="Flags" />
+                          <Component Name="Ready" />
+                        </Symbol>
+                      </Access>
+                    </StructuredText>
+                  </Root>
+                  """;
+
+        var result = StructuredTextReconstructor.Reconstruct(xml, "AWL");
+
+        Assert.Equal("Success", result.ReconstructionStatus);
+        Assert.Equal("U MyDb.Flags.Ready", result.ReconstructedSourceText);
+    }
+
+    [Fact]
+    public void Reconstruct_AwlDecodesEntities()
+    {
+        var xml = """
+                  <Root>
+                    <StructuredText>
+                      <Token Text="L" />
+                      <Blank />
+                      <ConstantValue>&amp;MyConst</ConstantValue>
+                    </StructuredText>
+                  </Root>
+                  """;
+
+        var result = StructuredTextReconstructor.Reconstruct(xml, "AWL");
+
+        Assert.Equal("Success", result.ReconstructionStatus);
+        Assert.Equal("L &MyConst", result.ReconstructedSourceText);
+    }
 }

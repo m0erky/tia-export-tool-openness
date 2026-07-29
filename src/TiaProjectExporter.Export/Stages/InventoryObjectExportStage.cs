@@ -105,7 +105,7 @@ public sealed class InventoryObjectExportStage : IExportStage
                 "StructuredTextReconstruction",
                 "ByName Blocks",
                 ExportObjectStatus.Succeeded,
-                $"Blocks with exportXml: {byNameSummary.BlocksWithExportXml}; Success: {byNameSummary.Success}; NoStructuredText: {byNameSummary.NoStructuredText}; ParseError: {byNameSummary.ParseError}; UnsupportedPattern: {byNameSummary.UnsupportedPattern}"));
+                $"Blocks with exportXml: {byNameSummary.BlocksWithExportXml}; Success: {byNameSummary.Success}; NoStructuredText: {byNameSummary.NoStructuredText}; ParseError: {byNameSummary.ParseError}; UnsupportedPattern: {byNameSummary.UnsupportedPattern}; AWLEligible: {byNameSummary.AwlEligible}; AWLSuccess: {byNameSummary.AwlSuccess}; AWLFailure: {byNameSummary.AwlFailure}; AWLNoSource: {byNameSummary.AwlNoSource}"));
         }
 
         await context.ReportProgressAsync(
@@ -138,6 +138,7 @@ public sealed class InventoryObjectExportStage : IExportStage
             metadata.TryGetValue("CanonicalQualifiedPath", out var canonicalPath);
             metadata.TryGetValue("OriginalQualifiedPaths", out var originalPaths);
             metadata.TryGetValue("BlockNumber", out var blockNumber);
+            metadata.TryGetValue("Language", out var programmingLanguage);
 
             var baseName = BuildBlockFileBaseName(node);
             var finalName = baseName;
@@ -153,11 +154,28 @@ public sealed class InventoryObjectExportStage : IExportStage
             var relativeBasePath = $"Export/Blocks/ByName/{finalName}";
 
             StructuredTextReconstructionResult? reconstructionResult = null;
-            if (IsStructuredTextTargetBlock(node.ObjectType) && !string.IsNullOrWhiteSpace(exportXml))
+            var isTargetBlock = IsStructuredTextTargetBlock(node.ObjectType);
+            var isAwlBlock = isTargetBlock && IsAwlLanguage(programmingLanguage);
+
+            if (isAwlBlock)
+            {
+                reconstruction.AwlEligible++;
+            }
+
+            if (isTargetBlock && !string.IsNullOrWhiteSpace(exportXml))
             {
                 reconstruction.BlocksWithExportXml++;
-                reconstructionResult = StructuredTextReconstructor.Reconstruct(exportXml);
+                reconstructionResult = StructuredTextReconstructor.Reconstruct(exportXml, programmingLanguage);
                 reconstruction.Increment(reconstructionResult.ReconstructionStatus);
+
+                if (isAwlBlock)
+                {
+                    reconstruction.IncrementAwl(reconstructionResult.ReconstructionStatus);
+                }
+            }
+            else if (isAwlBlock)
+            {
+                reconstruction.AwlNoSource++;
             }
 
             var payload = new
@@ -204,13 +222,21 @@ public sealed class InventoryObjectExportStage : IExportStage
             Success: reconstruction.Success,
             NoStructuredText: reconstruction.NoStructuredText,
             ParseError: reconstruction.ParseError,
-            UnsupportedPattern: reconstruction.UnsupportedPattern);
+            UnsupportedPattern: reconstruction.UnsupportedPattern,
+            AwlEligible: reconstruction.AwlEligible,
+            AwlSuccess: reconstruction.AwlSuccess,
+            AwlFailure: reconstruction.AwlFailure,
+            AwlNoSource: reconstruction.AwlNoSource);
     }
 
     private static bool IsStructuredTextTargetBlock(string objectType) =>
         string.Equals(objectType, "FB", StringComparison.OrdinalIgnoreCase)
         || string.Equals(objectType, "FC", StringComparison.OrdinalIgnoreCase)
         || string.Equals(objectType, "OB", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsAwlLanguage(string? programmingLanguage) =>
+        string.Equals(programmingLanguage, "AWL", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(programmingLanguage, "STL", StringComparison.OrdinalIgnoreCase);
 
     private static string BuildBlockFileBaseName(TiaProjectObjectNode node)
     {
@@ -521,9 +547,13 @@ public sealed class InventoryObjectExportStage : IExportStage
         int Success,
         int NoStructuredText,
         int ParseError,
-        int UnsupportedPattern)
+        int UnsupportedPattern,
+        int AwlEligible,
+        int AwlSuccess,
+        int AwlFailure,
+        int AwlNoSource)
     {
-        public static BlockByNameExportSummary Empty { get; } = new(0, 0, 0, 0, 0, 0);
+        public static BlockByNameExportSummary Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     private sealed class BlockByNameReconstructionCounter
@@ -537,6 +567,14 @@ public sealed class InventoryObjectExportStage : IExportStage
         public int ParseError { get; set; }
 
         public int UnsupportedPattern { get; set; }
+
+        public int AwlEligible { get; set; }
+
+        public int AwlSuccess { get; set; }
+
+        public int AwlFailure { get; set; }
+
+        public int AwlNoSource { get; set; }
 
         public void Increment(string status)
         {
@@ -562,6 +600,17 @@ public sealed class InventoryObjectExportStage : IExportStage
             {
                 UnsupportedPattern++;
             }
+        }
+
+        public void IncrementAwl(string status)
+        {
+            if (string.Equals(status, "Success", StringComparison.OrdinalIgnoreCase))
+            {
+                AwlSuccess++;
+                return;
+            }
+
+            AwlFailure++;
         }
     }
 }

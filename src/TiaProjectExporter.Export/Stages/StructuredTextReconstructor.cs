@@ -5,7 +5,7 @@ namespace TiaProjectExporter.Export.Stages;
 
 public static class StructuredTextReconstructor
 {
-    public static StructuredTextReconstructionResult Reconstruct(string? exportXml)
+    public static StructuredTextReconstructionResult Reconstruct(string? exportXml, string? programmingLanguage = null)
     {
         if (string.IsNullOrWhiteSpace(exportXml))
         {
@@ -28,10 +28,12 @@ public static class StructuredTextReconstructor
             var fragments = new List<string>();
             var unsupportedElements = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+            var mode = DetermineMode(programmingLanguage);
+
             foreach (var structuredText in structuredTextNodes)
             {
                 var builder = new StringBuilder();
-                var context = new ReconstructionContext(unsupportedElements);
+                var context = new ReconstructionContext(unsupportedElements, mode);
 
                 foreach (var node in structuredText.Nodes())
                 {
@@ -49,9 +51,13 @@ public static class StructuredTextReconstructor
 
             if (!string.IsNullOrWhiteSpace(reconstructed))
             {
+                var diagnosticsPrefix = mode == ReconstructionMode.Awl
+                    ? "AWL reconstructed successfully."
+                    : "StructuredText reconstructed successfully.";
+
                 var diagnostics = unsupportedElements.Count == 0
-                    ? "StructuredText reconstructed successfully."
-                    : $"StructuredText reconstructed with unsupported elements ignored: {string.Join(", ", unsupportedElements.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))}.";
+                    ? diagnosticsPrefix
+                    : $"{diagnosticsPrefix} Unsupported elements ignored: {string.Join(", ", unsupportedElements.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))}.";
 
                 return new StructuredTextReconstructionResult(reconstructed, "Success", diagnostics);
             }
@@ -108,7 +114,7 @@ public static class StructuredTextReconstructor
                 builder.Append(ResolveText(element));
                 return;
             case "LineComment":
-                AppendLineComment(element, builder);
+                AppendLineComment(element, builder, context.Mode);
                 return;
             case "Access":
                 var accessPath = ResolveAccessPath(element);
@@ -180,7 +186,7 @@ public static class StructuredTextReconstructor
             : string.Join(".", components);
     }
 
-    private static void AppendLineComment(XElement commentElement, StringBuilder builder)
+    private static void AppendLineComment(XElement commentElement, StringBuilder builder, ReconstructionMode mode)
     {
         var textElement = commentElement
             .Descendants()
@@ -196,9 +202,10 @@ public static class StructuredTextReconstructor
         }
 
         var normalized = text.Trim();
-        if (!normalized.StartsWith("//", StringComparison.Ordinal))
+        var commentPrefix = mode == ReconstructionMode.Awl ? "//" : "//";
+        if (!normalized.StartsWith("//", StringComparison.Ordinal) && !normalized.StartsWith(";", StringComparison.Ordinal))
         {
-            normalized = $"// {normalized}";
+            normalized = $"{commentPrefix} {normalized}";
         }
 
         builder.Append(normalized);
@@ -276,7 +283,24 @@ public static class StructuredTextReconstructor
             : message[..280];
     }
 
-    private sealed record ReconstructionContext(HashSet<string> UnsupportedElements);
+    private static ReconstructionMode DetermineMode(string? programmingLanguage)
+    {
+        if (string.Equals(programmingLanguage, "AWL", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(programmingLanguage, "STL", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReconstructionMode.Awl;
+        }
+
+        return ReconstructionMode.StructuredText;
+    }
+
+    private enum ReconstructionMode
+    {
+        StructuredText,
+        Awl
+    }
+
+    private sealed record ReconstructionContext(HashSet<string> UnsupportedElements, ReconstructionMode Mode);
 }
 
 public sealed record StructuredTextReconstructionResult(

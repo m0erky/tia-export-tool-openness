@@ -70,6 +70,37 @@ public sealed class InventoryObjectExportStageTests
                         ["OriginalQualifiedPaths"] = "Project/Devices/PLC_1/Software/Blocks/Main/Startup",
                         ["BlockNumber"] = "1",
                         ["Content.SourceText"] = "ORGANIZATION_BLOCK Main"
+                    }),
+                new TiaProjectObjectNode(
+                    ObjectType: "FC",
+                    Name: "FC_AWL",
+                    QualifiedPath: "Project/Devices/PLC_1/Software/Blocks/FC_AWL",
+                    Depth: 2,
+                    Metadata: new Dictionary<string, string>
+                    {
+                        ["CanonicalQualifiedPath"] = "Project/Devices/PLC_1/Software/Blocks/FC_AWL",
+                        ["OriginalQualifiedPaths"] = "Project/Devices/PLC_1/Software/Blocks/FC_AWL",
+                        ["BlockNumber"] = "12",
+                        ["Language"] = "AWL",
+                        ["Content.ExportXml"] = """
+                                                <Document>
+                                                  <StructuredText>
+                                                    <Token Text="L" />
+                                                    <Blank />
+                                                    <ConstantValue>1</ConstantValue>
+                                                    <NewLine />
+                                                    <Token Text="T" />
+                                                    <Blank />
+                                                    <Access>
+                                                      <Symbol>
+                                                        <Component Name="DB10" />
+                                                        <Component Name="Result" />
+                                                      </Symbol>
+                                                    </Access>
+                                                  </StructuredText>
+                                                </Document>
+                                                """,
+                        ["Content.SourceText"] = "   "
                     })
             ],
             Issues: Array.Empty<ExportIssue>()));
@@ -90,6 +121,7 @@ public sealed class InventoryObjectExportStageTests
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FB_FB100.json");
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FB_FB100.md");
         Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/OB_Main_Startup.json");
+        Assert.Contains(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FC_FC_AWL.json");
 
         var fbByNameJson = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FB_FB100.json");
         using var byNameDocument = JsonDocument.Parse(fbByNameJson.Content);
@@ -98,6 +130,15 @@ public sealed class InventoryObjectExportStageTests
         var reconstructedSource = byNameRoot.GetProperty("reconstructedSourceText").GetString();
         Assert.False(string.IsNullOrWhiteSpace(reconstructedSource));
         Assert.Contains("IF Axis.Ready THEN", reconstructedSource!, StringComparison.Ordinal);
+
+        var awlByNameJson = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/FC_FC_AWL.json");
+        using var awlByNameDocument = JsonDocument.Parse(awlByNameJson.Content);
+        var awlByNameRoot = awlByNameDocument.RootElement;
+        Assert.Equal("Success", awlByNameRoot.GetProperty("reconstructionStatus").GetString());
+        var awlReconstructedSource = awlByNameRoot.GetProperty("reconstructedSourceText").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(awlReconstructedSource));
+        Assert.Contains("L 1", awlReconstructedSource!, StringComparison.Ordinal);
+        Assert.Contains("T DB10.Result", awlReconstructedSource!, StringComparison.Ordinal);
 
         var index = Assert.Single(writer.Artifacts, artifact => artifact.RelativePath == "Export/Blocks/ByName/INDEX.json");
         Assert.Contains("FB_FB100.json", index.Content, StringComparison.Ordinal);

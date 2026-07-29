@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.51**
+Version baseline for this milestone: **0.0.52**
 
 Scope:
 
@@ -51,7 +51,7 @@ Scope:
 ## Current State Snapshot (2026-07-29)
 
 ### Version / Commit
-- Version: `0.0.51`
+- Version: `0.0.52`
 - Last commit: `see git log --oneline`
 - Branch: `main`
 
@@ -74,6 +74,15 @@ Scope:
 - Deep export XML failures for inconsistent blocks/UDTs (Siemens-side project consistency state) remain a key source of partial content and need clear operator guidance.
 
 ### Recent technical changes (latest)
+- AWL reconstruction added to the existing ByName source-reconstruction flow for `FB/FC/OB`:
+  - language-aware mode selection via `Language/ProgrammingLanguage` metadata (`AWL`/`STL` -> AWL mode)
+  - instruction/operator + operand stream reconstruction from `StructuredText` token stream
+  - `Access -> Symbol -> Component` operand path resolution to dot-path notation
+  - comments (`LineComment/Text`), blank/newline formatting, and XML entity decoding preserved
+- Reconstruction summary now includes AWL-specific KPIs (`AWLEligible`, `AWLSuccess`, `AWLFailure`, `AWLNoSource`) in `EXPORT_REPORT.md`.
+- Added AWL-focused tests:
+  - unit tests for AWL instruction reconstruction, Access path resolution, entity decoding
+  - integration test for AWL ByName JSON (`reconstructionStatus=Success`, non-empty `reconstructedSourceText`).
 - Added `StructuredTextReconstructor` for `FB/FC/OB` ByName export payloads to reconstruct readable code from `exportXml` (`StructuredText`) when raw `sourceText` is only comments/whitespace.
 - ByName JSON payloads now include `reconstructedSourceText`, `reconstructionStatus`, and `reconstructionDiagnostics` for `FB/FC/OB` blocks while keeping `sourceText`/`exportXml` unchanged.
 - `EXPORT_REPORT.md` now includes `StructuredText Reconstruction Summary` (blocks with `exportXml`, success, `NoStructuredText`, errors, success rate).
@@ -202,6 +211,10 @@ Scope:
 
 ## Completed Tasks
 
+- Extended ByName source reconstruction to support AWL/STL language blocks in addition to existing SCL/structured-text behavior.
+- Added AWL-specific reconstruction KPIs to report summary output.
+- Added AWL unit + integration coverage without changing backward-compatible `sourceText`/`exportXml` fields.
+- Incremented application version to `0.0.52` in central build metadata and UI fallback version resolution.
 - Implemented structured-text reconstruction for ByName `FB/FC/OB` exports and exposed reconstruction fields in per-block JSON artifacts.
 - Added `StructuredText Reconstruction Summary` section to export report output.
 - Added unit + integration tests for reconstruction behavior and ByName payload population.
