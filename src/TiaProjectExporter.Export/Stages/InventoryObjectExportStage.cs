@@ -139,6 +139,7 @@ public sealed class InventoryObjectExportStage : IExportStage
             metadata.TryGetValue("OriginalQualifiedPaths", out var originalPaths);
             metadata.TryGetValue("BlockNumber", out var blockNumber);
             metadata.TryGetValue("Language", out var programmingLanguage);
+            var resolvedProgrammingLanguage = ResolveProgrammingLanguage(programmingLanguage, exportXml);
 
             var baseName = BuildBlockFileBaseName(node);
             var finalName = baseName;
@@ -155,7 +156,7 @@ public sealed class InventoryObjectExportStage : IExportStage
 
             StructuredTextReconstructionResult? reconstructionResult = null;
             var isTargetBlock = IsStructuredTextTargetBlock(node.ObjectType);
-            var isAwlBlock = isTargetBlock && IsAwlLanguage(programmingLanguage);
+            var isAwlBlock = isTargetBlock && IsAwlLanguage(resolvedProgrammingLanguage);
 
             if (isAwlBlock)
             {
@@ -165,7 +166,7 @@ public sealed class InventoryObjectExportStage : IExportStage
             if (isTargetBlock && !string.IsNullOrWhiteSpace(exportXml))
             {
                 reconstruction.BlocksWithExportXml++;
-                reconstructionResult = StructuredTextReconstructor.Reconstruct(exportXml, programmingLanguage);
+                reconstructionResult = StructuredTextReconstructor.Reconstruct(exportXml, resolvedProgrammingLanguage);
                 reconstruction.Increment(reconstructionResult.ReconstructionStatus);
 
                 if (isAwlBlock)
@@ -237,6 +238,37 @@ public sealed class InventoryObjectExportStage : IExportStage
     private static bool IsAwlLanguage(string? programmingLanguage) =>
         string.Equals(programmingLanguage, "AWL", StringComparison.OrdinalIgnoreCase)
         || string.Equals(programmingLanguage, "STL", StringComparison.OrdinalIgnoreCase);
+
+    private static string? ResolveProgrammingLanguage(string? metadataLanguage, string? exportXml)
+    {
+        if (!string.IsNullOrWhiteSpace(metadataLanguage))
+        {
+            return metadataLanguage;
+        }
+
+        if (string.IsNullOrWhiteSpace(exportXml))
+        {
+            return null;
+        }
+
+        try
+        {
+            var document = XDocument.Parse(exportXml, LoadOptions.PreserveWhitespace);
+            var language = document
+                .Descendants()
+                .Where(element =>
+                    element.Name.LocalName.Equals("ProgrammingLanguage", StringComparison.OrdinalIgnoreCase)
+                    || element.Name.LocalName.Equals("Language", StringComparison.OrdinalIgnoreCase))
+                .Select(element => element.Value?.Trim())
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+            return language;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private static string BuildBlockFileBaseName(TiaProjectObjectNode node)
     {

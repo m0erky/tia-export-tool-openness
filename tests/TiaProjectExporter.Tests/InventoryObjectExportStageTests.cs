@@ -81,23 +81,26 @@ public sealed class InventoryObjectExportStageTests
                         ["CanonicalQualifiedPath"] = "Project/Devices/PLC_1/Software/Blocks/FC_AWL",
                         ["OriginalQualifiedPaths"] = "Project/Devices/PLC_1/Software/Blocks/FC_AWL",
                         ["BlockNumber"] = "12",
-                        ["Language"] = "AWL",
                         ["Content.ExportXml"] = """
                                                 <Document>
-                                                  <StructuredText>
-                                                    <Token Text="L" />
-                                                    <Blank />
-                                                    <ConstantValue>1</ConstantValue>
-                                                    <NewLine />
-                                                    <Token Text="T" />
-                                                    <Blank />
-                                                    <Access>
-                                                      <Symbol>
-                                                        <Component Name="DB10" />
-                                                        <Component Name="Result" />
-                                                      </Symbol>
-                                                    </Access>
-                                                  </StructuredText>
+                                                  <ProgrammingLanguage>STL</ProgrammingLanguage>
+                                                  <NetworkSource>
+                                                    <StatementList>
+                                                      <StlStatement>
+                                                        <StlToken>L</StlToken>
+                                                        <ConstantValue>1</ConstantValue>
+                                                      </StlStatement>
+                                                      <StlStatement>
+                                                        <StlToken>T</StlToken>
+                                                        <Access>
+                                                          <Symbol>
+                                                            <Component Name="DB10" />
+                                                            <Component Name="Result" />
+                                                          </Symbol>
+                                                        </Access>
+                                                      </StlStatement>
+                                                    </StatementList>
+                                                  </NetworkSource>
                                                 </Document>
                                                 """,
                         ["Content.SourceText"] = "   "
@@ -148,6 +151,11 @@ public sealed class InventoryObjectExportStageTests
         Assert.Equal(ExportObjectStatus.Succeeded, result.Status);
         Assert.Contains("bundles", result.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("per-block", result.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        var reconstructionResult = Assert.Single(context.Results, item => item.ObjectType == "StructuredTextReconstruction");
+        Assert.Contains("AWLEligible: ", reconstructionResult.Message ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("AWLSuccess: ", reconstructionResult.Message ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("AWLEligible: 0", reconstructionResult.Message ?? string.Empty, StringComparison.Ordinal);
     }
 
     private sealed class RecordingArtifactWriter : IExportArtifactWriter

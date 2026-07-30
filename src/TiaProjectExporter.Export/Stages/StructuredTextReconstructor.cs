@@ -15,6 +15,22 @@ public static class StructuredTextReconstructor
         try
         {
             var document = XDocument.Parse(exportXml, LoadOptions.PreserveWhitespace);
+            var mode = DetermineMode(programmingLanguage);
+
+            if (mode == ReconstructionMode.Awl)
+            {
+                var awlResult = TryReconstructAwlStatementList(document);
+                if (awlResult.IsSuccess)
+                {
+                    return new StructuredTextReconstructionResult(awlResult.ReconstructedText, "Success", awlResult.Diagnostics);
+                }
+
+                if (awlResult.HasStatementList)
+                {
+                    return new StructuredTextReconstructionResult(null, "UnsupportedPattern", awlResult.Diagnostics);
+                }
+            }
+
             var structuredTextNodes = document
                 .Descendants()
                 .Where(element => element.Name.LocalName.Equals("StructuredText", StringComparison.OrdinalIgnoreCase))
@@ -27,8 +43,6 @@ public static class StructuredTextReconstructor
 
             var fragments = new List<string>();
             var unsupportedElements = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var mode = DetermineMode(programmingLanguage);
 
             foreach (var structuredText in structuredTextNodes)
             {
@@ -76,6 +90,138 @@ public static class StructuredTextReconstructor
         {
             return new StructuredTextReconstructionResult(null, "ParseError", TruncateDiagnostics(exception.Message));
         }
+    }
+
+    private static AwlStatementListResult TryReconstructAwlStatementList(XDocument document)
+    {
+        var statementLists = document
+            .Descendants()
+            .Where(element => element.Name.LocalName.Equals("StatementList", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (statementLists.Length == 0)
+        {
+            return AwlStatementListResult.NoStatementList;
+        }
+
+        var reconstructedLines = new List<string>();
+        var unsupportedElements = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var statementList in statementLists)
+        {
+            var statements = statementList
+                .Descendants()
+                .Where(element => element.Name.LocalName.Contains("Statement", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            foreach (var statement in statements)
+            {
+                var tokens = statement
+                    .DescendantsAndSelf()
+                    .Where(element => IsAwlTokenElement(element.Name.LocalName))
+                    .Select(ResolveAwlToken)
+                    .Where(token => !string.IsNullOrWhiteSpace(token))
+                    .ToList();
+
+                if (tokens.Count == 0)
+                {
+                    continue;
+                }
+
+                var line = NormalizeAwlLine(string.Join(" ", tokens));
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    reconstructedLines.Add(line);
+                }
+            }
+
+            if (reconstructedLines.Count == 0)
+            {
+                foreach (var element in statementList.Descendants())
+                {
+                    unsupportedElements.Add(element.Name.LocalName);
+                }
+            }
+        }
+
+        if (reconstructedLines.Count == 0)
+        {
+            var diagnostics = unsupportedElements.Count == 0
+                ? "STL StatementList found but no reconstructable tokens were detected."
+                : $"STL StatementList found but no reconstructable tokens were detected. Elements: {string.Join(", ", unsupportedElements.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).Take(20))}.";
+
+            return new AwlStatementListResult(true, false, null, diagnostics);
+        }
+
+        return new AwlStatementListResult(true, true, string.Join("\n", reconstructedLines), "AWL reconstructed successfully from StatementList.");
+    }
+
+    private static bool IsAwlTokenElement(string localName) =>
+        localName.Equals("Token", StringComparison.OrdinalIgnoreCase)
+        || localName.Contains("Token", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("Access", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("ConstantValue", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("LineComment", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("Blank", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("NewLine", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("Assign", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("Instruction", StringComparison.OrdinalIgnoreCase)
+        || localName.Equals("Operator", StringComparison.OrdinalIgnoreCase);
+
+    private static string ResolveAwlToken(XElement element)
+    {
+        var localName = element.Name.LocalName;
+
+        if (localName.Equals("Access", StringComparison.OrdinalIgnoreCase))
+        {
+            return ResolveAccessPath(element);
+        }
+
+        if (localName.Equals("LineComment", StringComparison.OrdinalIgnoreCase))
+        {
+            var commentBuilder = new StringBuilder();
+            AppendLineComment(element, commentBuilder, ReconstructionMode.Awl);
+            return commentBuilder.ToString();
+        }
+
+        if (localName.Equals("Blank", StringComparison.OrdinalIgnoreCase)
+            || localName.Equals("NewLine", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        var token = ResolveText(element);
+        if (string.Equals(token, "Assign", StringComparison.OrdinalIgnoreCase))
+        {
+            return "=";
+        }
+
+        return token;
+    }
+
+    private static string NormalizeAwlLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return string.Empty;
+        }
+
+        return line
+            .Replace("\r\n", " ", StringComparison.Ordinal)
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Aggregate(new StringBuilder(), (builder, token) =>
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append(' ');
+                }
+
+                builder.Append(token);
+                return builder;
+            })
+            .ToString();
     }
 
     private static void AppendNode(XNode node, StringBuilder builder, ReconstructionContext context)
@@ -301,6 +447,15 @@ public static class StructuredTextReconstructor
     }
 
     private sealed record ReconstructionContext(HashSet<string> UnsupportedElements, ReconstructionMode Mode);
+
+    private sealed record AwlStatementListResult(
+        bool HasStatementList,
+        bool IsSuccess,
+        string? ReconstructedText,
+        string Diagnostics)
+    {
+        public static AwlStatementListResult NoStatementList { get; } = new(false, false, null, "No STL StatementList found in exportXml.");
+    }
 }
 
 public sealed record StructuredTextReconstructionResult(

@@ -93,27 +93,37 @@ public sealed class StructuredTextReconstructorTests
     {
         var xml = """
                   <Root>
-                    <StructuredText>
-                      <Token Text="L" />
-                      <Blank />
-                      <ConstantValue>5</ConstantValue>
-                      <NewLine />
-                      <Token Text="T" />
-                      <Blank />
-                      <Access>
-                        <Symbol>
-                          <Component Name="DB1" />
-                          <Component Name="TargetValue" />
-                        </Symbol>
-                      </Access>
-                    </StructuredText>
+                    <ProgrammingLanguage>STL</ProgrammingLanguage>
+                    <NetworkSource>
+                      <StatementList>
+                        <StlStatement>
+                          <StlToken>L</StlToken>
+                          <ConstantValue>1</ConstantValue>
+                        </StlStatement>
+                        <StlStatement>
+                          <StlToken>L</StlToken>
+                          <ConstantValue>2</ConstantValue>
+                        </StlStatement>
+                        <StlStatement>
+                          <StlToken>LT_D</StlToken>
+                        </StlStatement>
+                        <StlStatement>
+                          <StlToken>Assign</StlToken>
+                          <Access>
+                            <Symbol>
+                              <Component Name="test" />
+                            </Symbol>
+                          </Access>
+                        </StlStatement>
+                      </StatementList>
+                    </NetworkSource>
                   </Root>
                   """;
 
-        var result = StructuredTextReconstructor.Reconstruct(xml, "AWL");
+        var result = StructuredTextReconstructor.Reconstruct(xml, "STL");
 
         Assert.Equal("Success", result.ReconstructionStatus);
-        Assert.Equal("L 5\nT DB1.TargetValue", result.ReconstructedSourceText);
+        Assert.Equal("L 1\nL 2\nLT_D\n= test", result.ReconstructedSourceText);
     }
 
     [Fact]
@@ -121,21 +131,25 @@ public sealed class StructuredTextReconstructorTests
     {
         var xml = """
                   <Root>
-                    <StructuredText>
-                      <Token Text="U" />
-                      <Blank />
-                      <Access>
-                        <Symbol>
-                          <Component Name="MyDb" />
-                          <Component Name="Flags" />
-                          <Component Name="Ready" />
-                        </Symbol>
-                      </Access>
-                    </StructuredText>
+                    <ProgrammingLanguage>STL</ProgrammingLanguage>
+                    <NetworkSource>
+                      <StatementList>
+                        <StlStatement>
+                          <StlToken>U</StlToken>
+                          <Access>
+                            <Symbol>
+                              <Component Name="MyDb" />
+                              <Component Name="Flags" />
+                              <Component Name="Ready" />
+                            </Symbol>
+                          </Access>
+                        </StlStatement>
+                      </StatementList>
+                    </NetworkSource>
                   </Root>
                   """;
 
-        var result = StructuredTextReconstructor.Reconstruct(xml, "AWL");
+        var result = StructuredTextReconstructor.Reconstruct(xml, "STL");
 
         Assert.Equal("Success", result.ReconstructionStatus);
         Assert.Equal("U MyDb.Flags.Ready", result.ReconstructedSourceText);
@@ -146,15 +160,19 @@ public sealed class StructuredTextReconstructorTests
     {
         var xml = """
                   <Root>
-                    <StructuredText>
-                      <Token Text="L" />
-                      <Blank />
-                      <ConstantValue>&amp;MyConst</ConstantValue>
-                    </StructuredText>
+                    <ProgrammingLanguage>STL</ProgrammingLanguage>
+                    <NetworkSource>
+                      <StatementList>
+                        <StlStatement>
+                          <StlToken>L</StlToken>
+                          <ConstantValue>&amp;MyConst</ConstantValue>
+                        </StlStatement>
+                      </StatementList>
+                    </NetworkSource>
                   </Root>
                   """;
 
-        var result = StructuredTextReconstructor.Reconstruct(xml, "AWL");
+        var result = StructuredTextReconstructor.Reconstruct(xml, "STL");
 
         Assert.Equal("Success", result.ReconstructionStatus);
         Assert.Equal("L &MyConst", result.ReconstructedSourceText);
