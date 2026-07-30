@@ -28,6 +28,11 @@ internal static class Program
     private const int MaxExportXmlChars = 500_000;
     private const int MaxSourceTextChars = 250_000;
     private const int MaxXmlSourceParseChars = 1_000_000;
+    private const int MaxSafetyLoginProbeNodes = 400;
+    private const int MaxSafetyLoginQueueSize = 3000;
+    private const int MaxSafetyLoginDepth = 3;
+    private const int MaxSafetyLoginChildrenPerNode = 96;
+    private const int MaxSafetyLoginFailureIssues = 24;
     private static readonly TimeSpan SlowPropertyThreshold = TimeSpan.FromSeconds(2);
     private static readonly string[] SafetyAdministrationTypeCandidates =
     [
@@ -1440,12 +1445,16 @@ internal static class Program
         var scannedNodes = 0;
         var successfulLogins = 0;
         var failedLogins = 0;
+        var enqueuedNodes = 1;
+        var droppedChildrenByQueueLimit = 0;
+        var suppressedFailureIssues = 0;
+        var failureIssuesLogged = 0;
 
-        while (queue.Count > 0 && scannedNodes < 2000)
+        while (queue.Count > 0 && scannedNodes < MaxSafetyLoginProbeNodes)
         {
             var current = queue.Dequeue();
 
-            if (current.Depth > 7 || !visited.Add(current.Node))
+            if (current.Depth > MaxSafetyLoginDepth || !visited.Add(current.Node))
             {
                 continue;
             }
@@ -1467,19 +1476,52 @@ internal static class Program
                 else
                 {
                     failedLogins++;
-                    issues.Add(new HostIssue
+                    if (failureIssuesLogged < MaxSafetyLoginFailureIssues)
                     {
-                        Scope = "SafetyAdministration",
-                        Message = "Safety login attempt failed.",
-                        Details = $"Node: {current.Path}; Service: {serviceType.FullName}; {error}"
-                    });
+                        issues.Add(new HostIssue
+                        {
+                            Scope = "SafetyAdministration",
+                            Message = "Safety login attempt failed.",
+                            Details = $"Node: {current.Path}; Service: {serviceType.FullName}; {error}"
+                        });
+
+                        failureIssuesLogged++;
+                    }
+                    else
+                    {
+                        suppressedFailureIssues++;
+                    }
                 }
             }
 
+            var childrenAddedForNode = 0;
             foreach (var child in EnumerateChildObjects(current.Node, current.Path, issues))
             {
+                if (childrenAddedForNode >= MaxSafetyLoginChildrenPerNode)
+                {
+                    break;
+                }
+
+                if (queue.Count >= MaxSafetyLoginQueueSize)
+                {
+                    droppedChildrenByQueueLimit++;
+                    continue;
+                }
+
                 queue.Enqueue((child, $"{current.Path}/{child.GetType().Name}", current.Depth + 1));
+                enqueuedNodes++;
+                childrenAddedForNode++;
             }
+        }
+
+        if (suppressedFailureIssues > 0)
+        {
+            issues.Add(new HostIssue
+            {
+                Scope = "SafetyAdministration",
+                Message = "Safety login failure diagnostics were truncated.",
+                Details = $"Logged: {failureIssuesLogged}; Suppressed: {suppressedFailureIssues}; Limit: {MaxSafetyLoginFailureIssues}."
+            });
         }
 
         issues.Add(new HostIssue
@@ -1488,7 +1530,7 @@ internal static class Program
             Message = successfulLogins > 0
                 ? "Safety offline program login completed before traversal."
                 : "Safety offline program login did not authenticate any accessible safety context.",
-            Details = $"Successful logins: {successfulLogins}; Failed logins: {failedLogins}; Scanned nodes: {scannedNodes}; Service types: {string.Join(", ", safetyServiceTypes.Select(type => type.FullName))}."
+            Details = $"Successful logins: {successfulLogins}; Failed logins: {failedLogins}; Scanned nodes: {scannedNodes}; Enqueued nodes: {enqueuedNodes}; Queue drops: {droppedChildrenByQueueLimit}; Limits: depth={MaxSafetyLoginDepth}, nodes={MaxSafetyLoginProbeNodes}, queue={MaxSafetyLoginQueueSize}, children/node={MaxSafetyLoginChildrenPerNode}; Service types: {string.Join(", ", safetyServiceTypes.Select(type => type.FullName))}."
         });
     }
 

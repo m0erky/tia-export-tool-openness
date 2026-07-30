@@ -39,7 +39,7 @@ Architectural decisions:
 
 Milestone 2: TIA project traversal and object inventory
 
-Version baseline for this milestone: **0.0.52**
+Version baseline for this milestone: **0.0.53**
 
 Scope:
 
@@ -51,7 +51,7 @@ Scope:
 ## Current State Snapshot (2026-07-29)
 
 ### Version / Commit
-- Version: `0.0.52`
+- Version: `0.0.53`
 - Last commit: `see git log --oneline`
 - Branch: `main`
 
@@ -74,6 +74,11 @@ Scope:
 - Deep export XML failures for inconsistent blocks/UDTs (Siemens-side project consistency state) remain a key source of partial content and need clear operator guidance.
 
 ### Recent technical changes (latest)
+- Hardened pre-traversal Safety login scan to prevent memory blowups on large projects:
+  - bounded node scan, queue size, scan depth, and children-per-node limits
+  - bounded number of per-node failure issues with explicit truncation diagnostics
+  - summary diagnostics now include safety-scan limit/cap counters (`queue drops`, `enqueued nodes`, limits used)
+- This specifically targets host crash scenarios (`OutOfMemoryException`) that occurred before main traversal when Safety offline login probing was enabled.
 - AWL reconstruction added to the existing ByName source-reconstruction flow for `FB/FC/OB`:
   - language-aware mode selection via `Language/ProgrammingLanguage` metadata (`AWL`/`STL` -> AWL mode)
   - instruction/operator + operand stream reconstruction from `StructuredText` token stream
@@ -211,6 +216,8 @@ Scope:
 
 ## Completed Tasks
 
+- Added OOM-guard rails for Safety pre-login probing in Openness host and improved diagnostics for bounded scans.
+- Incremented application version to `0.0.53` in central build metadata and UI fallback version resolution.
 - Extended ByName source reconstruction to support AWL/STL language blocks in addition to existing SCL/structured-text behavior.
 - Added AWL-specific reconstruction KPIs to report summary output.
 - Added AWL unit + integration coverage without changing backward-compatible `sourceText`/`exportXml` fields.
